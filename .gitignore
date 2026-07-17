@@ -1,0 +1,7 @@
+# WorkBuddy 工作区数据（记忆日志等），不需要进公开仓库
+.workbuddy/
+
+# 系统与编辑器
+.DS_Store
+*.log
+node_modules/
