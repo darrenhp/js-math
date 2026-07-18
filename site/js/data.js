@@ -8,6 +8,7 @@ window.CATEGORIES = [
   { id: "geometry", name: "几何 / 图形计算", color: "#ff7ac6" },
   { id: "random",   name: "随机数 / 概率",  color: "#6be585" },
   { id: "symbolic", name: "符号计算 / 表达式", color: "#b18cff" },
+  { id: "genfunc",  name: "生成函数 / 多项式", color: "#5ec8ff" },
   { id: "ml",       name: "机器学习 / 张量", color: "#ff9f6b" },
 ];
 
@@ -220,6 +221,52 @@ window.LIBS = [
     pros: ["纯符号计算能力强", "浏览器可直接运行", "语法接近数学"],
     cons: ["复杂表达式性能有限", "文档较为简单"],
     demo: "algebrite",
+  },
+  {
+    id: "nerdamer", cat: "symbolic", name: "nerdamer", global: "nerdamer",
+    npm: "https://www.npmjs.com/package/nerdamer", site: "https://nerdamer.com/demo.html",
+    tagline: "功能完整的浏览器端符号计算引擎，尤其擅长解方程与方程组。",
+    positioning: "比 Algebrite 更全面的 CAS：化简/展开/因式分解、微积分、级数、以及强大的 solve / solveEquations。",
+    capabilities: ["表达式化简 / 展开 / 因式分解", "符号求导与积分", "解一元方程与多元方程组 (solve/solveEquations)", "提取多项式系数 coeffs、级数求和 sum"],
+    useCases: ["在线方程求解器", "生成函数系数提取与验证", "数学教学与公式推导", "科学计算器进阶功能"],
+    pros: ["解方程能力强、支持方程组", "功能覆盖面广（微积分/矩阵/级数）", "纯浏览器可运行"],
+    cons: ["体积较大 (all.min.js)", "复杂符号运算可能给出数值近似"],
+    demo: "nerdamer",
+  },
+
+  /* ---------- 生成函数 / 多项式 ---------- */
+  {
+    id: "polynomial-rw", cat: "genfunc", name: "Polynomial.js", global: "Polynomial",
+    npm: "https://www.npmjs.com/package/polynomial", site: "https://github.com/rawify/Polynomial.js",
+    tagline: "rawify 出品的多项式运算库，把多项式乘法当作系数卷积，天然适配生成函数。",
+    positioning: "生成函数系数运算的主力：多项式乘法即系数卷积，支持实数/有理数(分数)域与稀疏高次幂级数。",
+    capabilities: ["多项式加/乘（= 系数卷积）与幂 pow", "稀疏高次幂级数（系数按指数存储）", "分数域 (Q) 精确系数、求导 derive", "在某点求值 result(x)、读取系数 .coeff"],
+    useCases: ["生成函数展开与系数提取", "组合计数（硬币找零 / 受限分拆）", "卷积 / 二项式系数（帕斯卡三角）", "卡特兰数等组合序列验证"],
+    pros: ["乘法即卷积，契合生成函数", "支持分数域，系数精确", "稀疏存储，适合高次幂"],
+    cons: ["不做形式幂级数除法（如 1/(1-x) 需手工截断）", "字符串解析对写法较敏感"],
+    demo: "polynomialrw",
+  },
+  {
+    id: "polynomium", cat: "genfunc", name: "polynomium", global: "polynomium",
+    npm: "https://www.npmjs.com/package/polynomium", site: "https://github.com/lapets/polynomium",
+    tagline: "支持多变量的符号多项式库，适合双变量、三维的组合计数生成函数。",
+    positioning: "专注多元多项式（多变量生成函数）：用变量/常量构造、相乘展开，读取任意项系数。",
+    capabilities: ["多变量多项式构造 (variable/constant)", "加法 add、乘法 mul 自动合并同类项", "多点代入求值 evaluate", "转字符串 / 系数对象 toObject"],
+    useCases: ["双变量生成函数（如 (x+y)^n）", "三维 / 多维计数问题", "多元组合展开与系数提取", "教学演示"],
+    pros: ["原生支持多变量", "API 直观（v/c/add/mul）", "轻量、无依赖"],
+    cons: ["仅符号展开，无级数除法", "维护活跃度一般"],
+    demo: "polynomium",
+  },
+  {
+    id: "jisg", cat: "genfunc", name: "jisg", global: "jisg",
+    npm: "https://www.npmjs.com/package/jisg", site: "https://github.com/acerix/jisg",
+    tagline: "内置 300+ 条 OEIS 标准整数序列的生成器库，用 BigInt 精确输出。",
+    positioning: "验证数列的“标准答案本”：直接生成斐波那契、卡特兰、分拆等 OEIS 序列，与多项式库结果对照。",
+    capabilities: ["300+ OEIS 序列（A000045 斐波那契 / A000108 卡特兰 / A000041 分拆 …）", "惰性生成器 (generator)，可取任意前 N 项", "BigInt 精确、无溢出", "适合与多项式/生成函数结果交叉验证"],
+    useCases: ["验证自算数列是否正确", "对照 OEIS 标准序列", "生成组合序列做教学", "为生成函数系数提供基准答案"],
+    pros: ["序列覆盖广、权威", "BigInt 精确无溢出", "生成器惰性求值"],
+    cons: ["仅提供序列，不做符号运算", "序列编号需查 OEIS"],
+    demo: "jisg",
   },
 
   /* ---------- 机器学习 / 张量 ---------- */

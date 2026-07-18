@@ -86,6 +86,33 @@
     ctx.fillText(title, ox + size / 2, oy - 8);
   }
 
+  // 柱状图：labels 为 x 轴标签，values 为数值（可为 BigInt/Number），opts.title/color/valFmt
+  function bars(ctx, w, h, labels, values, opts = {}) {
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = css("--code-bg"); ctx.fillRect(0, 0, w, h);
+    const pad = { l: 12, r: 12, t: 24, b: 24 };
+    const iw = w - pad.l - pad.r, ih = h - pad.t - pad.b;
+    const nums = values.map((v) => Number(v));
+    const mx = Math.max(...nums, 1), n = nums.length;
+    const bw = iw / Math.max(n, 1);
+    if (opts.title) {
+      ctx.fillStyle = css("--text-dim"); ctx.font = "11px monospace";
+      ctx.textAlign = "left"; ctx.textBaseline = "top"; ctx.fillText(opts.title, pad.l, 5);
+    }
+    const color = opts.color || css("--accent");
+    for (let i = 0; i < n; i++) {
+      const bh = mx > 0 ? (nums[i] / mx) * ih : 0;
+      const x = pad.l + i * bw, y = pad.t + ih - bh;
+      ctx.fillStyle = color; ctx.fillRect(x + 2, y, Math.max(bw - 4, 1), bh);
+      ctx.fillStyle = css("--text"); ctx.font = "9px monospace";
+      ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+      const vl = opts.valFmt ? opts.valFmt(values[i]) : String(values[i]);
+      if (bw > 16) ctx.fillText(vl, x + bw / 2, y - 2);
+      ctx.fillStyle = css("--text-faint"); ctx.textBaseline = "top";
+      ctx.fillText(String(labels[i]), x + bw / 2, pad.t + ih + 4);
+    }
+  }
+
   // 标准骨架：左控件+结果，右可视化
   function skeleton(root, controlsHTML, opts = {}) {
     const single = opts.single ? "single" : "";
@@ -267,6 +294,60 @@ math.evaluate('2 hour + 30 minute').to('minute').toNumber(); // 150`,
                 '<span class="muted">// 单位维度：' + u.format().split(" ")[0] + ' → ' + to + '</span>';
             } catch (e) { out.innerHTML = '<span class="err">无法换算: ' + e.message + '</span>'; }
           }
+          root.querySelector("[data-run]").onclick = run; run();
+        },
+      },
+      {
+        label: "生成函数 / EGF",
+        code:
+`// 由生成函数闭式 G(x) 求数列 a_n
+// 普通生成函数(OGF)：a_n = [x^n] G(x) = G⁽ⁿ⁾(0) / n!
+// 指数生成函数(EGF)：a_n = n! · [x^n] G(x)
+const G = '1/(1-x-x^2)';          // 斐波那契的 OGF
+let cur = math.parse(G), fact = 1, a = [];
+for (let n = 0; n <= 8; n++) {
+  const c = cur.compile().evaluate({ x: 0 }) / fact; // 泰勒系数
+  a.push(Math.round(c));
+  cur = math.derivative(cur, 'x');   // 符号求导，逐阶推进
+  fact *= (n + 1);
+}
+// a = [1,1,2,3,5,8,13,21,34]  → 斐波那契数`,
+        mount(root) {
+          const { out, viz } = skeleton(root,
+            '<div class="field"><label>生成函数闭式 G(x) <span class="hint">如 1/(1-x)、1/(1-x-x^2)、e^x、1/(1-2x)</span></label>' +
+            '<input type="text" data-g value="1/(1-x-x^2)" /></div>' +
+            '<div class="field"><label>模式</label><select data-mode>' +
+            '<option value="ogf">普通生成函数 OGF：a_n=[x^n]G</option>' +
+            '<option value="egf">指数生成函数 EGF：a_n=n!·[x^n]G</option></select></div>' +
+            '<div class="field"><label>项数 N</label><div class="range-row"><input type="range" data-n min="4" max="9" value="8" /><span class="range-val" data-nv>8</span></div></div>' +
+            '<div class="btn-row"><button class="btn" data-run>展开系数</button></div>',
+            { vizLabel: "系数 a_n 柱状图" });
+          const { c, ctx, w, h } = mkCanvas(430, 260); viz.appendChild(c);
+          root.querySelector("[data-n]").oninput = (e) => (root.querySelector("[data-nv]").textContent = e.target.value);
+          function run() {
+            try {
+              if (!window.math) throw new Error("math.js 未加载");
+              const G = root.querySelector("[data-g]").value;
+              const mode = root.querySelector("[data-mode]").value;
+              const N = +root.querySelector("[data-n]").value;
+              let cur = math.parse(G), fact = 1; const ogf = [], seq = [];
+              for (let n = 0; n <= N; n++) {
+                const cn = cur.compile().evaluate({ x: 0 }) / fact;
+                ogf.push(cn);
+                let nf = 1; for (let j = 2; j <= n; j++) nf *= j;
+                seq.push(mode === "egf" ? cn * nf : cn);
+                cur = math.derivative(cur, "x"); fact *= (n + 1);
+              }
+              const rounded = seq.map((v) => Math.abs(v - Math.round(v)) < 1e-6 ? Math.round(v) : parseFloat(v.toFixed(4)));
+              out.innerHTML =
+                '<span class="k">G(x) = </span><span class="v">' + G + '</span>\n' +
+                '<span class="k">G\'(x) = </span><span class="v">' + math.derivative(G, "x").toString() + '</span>\n\n' +
+                '<span class="muted">' + (mode === "egf" ? "EGF" : "OGF") + ' 数列 a₀…aₙ：</span>\n' +
+                '<span class="ok">' + rounded.join(", ") + '</span>';
+              bars(ctx, w, h, rounded.map((_, i) => "a" + i), rounded, { title: (mode === "egf" ? "EGF" : "OGF") + " 系数 a_n", color: css("--accent-3") });
+            } catch (e) { out.innerHTML = '<span class="err">' + e.message + '</span>'; }
+          }
+          root.querySelector("[data-mode]").onchange = run;
           root.querySelector("[data-run]").onclick = run; run();
         },
       },
@@ -2380,6 +2461,543 @@ const ysPred = model.predict(xsPred.reshape([-1, 1]));
       },
     ],
   };
+
+  /* ---------- nerdamer（符号计算 / 解方程）---------- */
+  DEMOS.nerdamer = {
+    tabs: [
+      {
+        label: "化简 / 展开 / 因式分解",
+        code:
+`nerdamer('expand((x+1)^3)').toString();      // 1+3*x+3*x^2+x^3
+nerdamer('factor(x^2+2x+1)').toString();     // (1+x)^2
+nerdamer('simplify((x^2-1)/(x-1))').toString(); // 1+x`,
+        mount(root) {
+          const { out } = skeleton(root,
+            '<div class="field"><label>表达式</label><input type="text" data-expr value="(x+1)^3" /></div>' +
+            '<div class="field"><label>操作</label><select data-op>' +
+            '<option value="expand">展开 expand</option><option value="factor">因式分解 factor</option><option value="simplify">化简 simplify</option></select></div>' +
+            '<div class="btn-row"><button class="btn" data-run>运行</button></div>', { single: true });
+          function run() {
+            try {
+              if (!window.nerdamer) throw new Error("nerdamer 未加载");
+              const expr = root.querySelector("[data-expr]").value, op = root.querySelector("[data-op]").value;
+              const res = nerdamer(op + "(" + expr + ")").toString();
+              out.innerHTML = '<span class="muted">' + op + "(" + expr + ")</span>\n<span class=\"k\">= </span><span class=\"ok\">" + res + "</span>";
+            } catch (e) { out.innerHTML = '<span class="err">' + e.message + "</span>"; }
+          }
+          root.querySelector("[data-op]").onchange = run;
+          root.querySelector("[data-run]").onclick = run; run();
+        },
+      },
+      {
+        label: "求导 / 积分",
+        code:
+`nerdamer('diff(x^3+2x, x)').toString();       // 2+3*x^2
+nerdamer('integrate(x^2+1, x)').toString();   // x+x^3/3`,
+        mount(root) {
+          const { out } = skeleton(root,
+            '<div class="field"><label>表达式</label><input type="text" data-expr value="x^3+2*x" /></div>' +
+            '<div class="field"><label>操作</label><select data-op><option value="diff">求导 diff</option><option value="integrate">积分 integrate</option></select></div>' +
+            '<div class="field"><label>变量</label><input type="text" data-var value="x" /></div>' +
+            '<div class="btn-row"><button class="btn" data-run>运行</button></div>', { single: true });
+          function run() {
+            try {
+              if (!window.nerdamer) throw new Error("nerdamer 未加载");
+              const expr = root.querySelector("[data-expr]").value, op = root.querySelector("[data-op]").value, v = root.querySelector("[data-var]").value;
+              const cmd = op + "(" + expr + ", " + v + ")";
+              const res = nerdamer(cmd).toString();
+              out.innerHTML = '<span class="muted">' + cmd + "</span>\n<span class=\"k\">= </span><span class=\"ok\">" + res + "</span>";
+            } catch (e) { out.innerHTML = '<span class="err">' + e.message + "</span>"; }
+          }
+          root.querySelector("[data-op]").onchange = run;
+          root.querySelector("[data-run]").onclick = run; run();
+        },
+      },
+      {
+        label: "解方程 solve ⭐",
+        code:
+`// 一元方程（含多解）
+nerdamer.solve('x^2-5*x+6=0', 'x').toString();   // [2,3]
+
+// 多元方程组
+nerdamer.solveEquations(['x+y=10', 'x-y=2']);    // x=6, y=4`,
+        mount(root) {
+          const { out } = skeleton(root,
+            '<div class="field"><label>模式</label><select data-mode>' +
+            '<option value="one">一元方程 solve</option><option value="sys">方程组 solveEquations</option></select></div>' +
+            '<div class="field" data-one><label>方程</label><input type="text" data-eq value="x^2-5*x+6=0" />' +
+            '<label style="margin-top:8px">变量</label><input type="text" data-v value="x" /></div>' +
+            '<div class="field" data-sys style="display:none"><label>方程组（每行一个）</label><textarea data-eqs rows="3">x+y=10\nx-y=2</textarea></div>' +
+            '<div class="btn-row"><button class="btn" data-run>求解</button></div>', { single: true });
+          function toggle() {
+            const sys = root.querySelector("[data-mode]").value === "sys";
+            root.querySelector("[data-one]").style.display = sys ? "none" : "";
+            root.querySelector("[data-sys]").style.display = sys ? "" : "none";
+          }
+          function run() {
+            try {
+              if (!window.nerdamer) throw new Error("nerdamer 未加载");
+              const mode = root.querySelector("[data-mode]").value;
+              if (mode === "one") {
+                const eq = root.querySelector("[data-eq]").value, v = root.querySelector("[data-v]").value;
+                const sol = nerdamer.solve(eq, v).toString();
+                out.innerHTML = '<span class="muted">solve(' + eq + ", " + v + ")</span>\n<span class=\"k\">" + v + " ∈ </span><span class=\"ok\">" + sol + "</span>";
+              } else {
+                const eqs = root.querySelector("[data-eqs]").value.split("\n").map((s) => s.trim()).filter(Boolean);
+                const flat = nerdamer.solveEquations(eqs);
+                // 返回形如 [[ 'x',6 ],[ 'y',4 ]] 或扁平 [x,6,y,4]
+                let pairs = [];
+                if (Array.isArray(flat) && Array.isArray(flat[0])) pairs = flat.map((p) => p[0] + " = " + p[1]);
+                else { const a = flat.toString().split(","); for (let i = 0; i < a.length; i += 2) pairs.push(a[i] + " = " + a[i + 1]); }
+                out.innerHTML = '<span class="muted">solveEquations:</span>\n' + eqs.map((e) => "  " + e).join("\n") + '\n\n<span class="k">解：</span><span class="ok">' + pairs.join("，  ") + "</span>";
+              }
+            } catch (e) { out.innerHTML = '<span class="err">' + e.message + "</span>"; }
+          }
+          root.querySelector("[data-mode]").onchange = () => { toggle(); run(); };
+          root.querySelector("[data-run]").onclick = run; toggle(); run();
+        },
+      },
+      {
+        label: "系数提取 / 级数",
+        code:
+`// 提取多项式（生成函数）各项系数
+nerdamer('coeffs((x+1)^5, x)').toString();  // [1,5,10,10,5,1]
+
+// 几何级数 = 1/(1-x) 的截断（全 1 序列的生成函数）
+nerdamer('sum(x^k, k, 0, 5)').toString();   // 1+x+x^2+x^3+x^4+x^5`,
+        mount(root) {
+          const { out, viz } = skeleton(root,
+            '<div class="field"><label>操作</label><select data-op>' +
+            '<option value="coeffs">提取系数 coeffs</option><option value="sum">几何级数 sum</option></select></div>' +
+            '<div class="field" data-c><label>多项式（生成函数）</label><input type="text" data-poly value="(x+1)^5" /></div>' +
+            '<div class="field" data-s style="display:none"><label>级数项数 n</label><div class="range-row"><input type="range" data-n min="3" max="10" value="6" /><span class="range-val" data-nv>6</span></div></div>' +
+            '<div class="btn-row"><button class="btn" data-run>运行</button></div>',
+            { vizLabel: "系数柱状图" });
+          const { c, ctx, w, h } = mkCanvas(430, 260); viz.appendChild(c);
+          root.querySelector("[data-n]").oninput = (e) => (root.querySelector("[data-nv]").textContent = e.target.value);
+          function toggle() {
+            const sum = root.querySelector("[data-op]").value === "sum";
+            root.querySelector("[data-c]").style.display = sum ? "none" : "";
+            root.querySelector("[data-s]").style.display = sum ? "" : "none";
+          }
+          function run() {
+            try {
+              if (!window.nerdamer) throw new Error("nerdamer 未加载");
+              const op = root.querySelector("[data-op]").value;
+              if (op === "coeffs") {
+                const poly = root.querySelector("[data-poly]").value;
+                const str = nerdamer("coeffs(" + poly + ", x)").toString();
+                const arr = str.replace(/[\[\]]/g, "").split(",").map((s) => Number(s.trim()));
+                out.innerHTML = '<span class="muted">coeffs(' + poly + ", x)</span>\n<span class=\"k\">系数 [x⁰,x¹,…] = </span><span class=\"ok\">[" + arr.join(", ") + "]</span>\n<span class=\"muted\">// 即生成函数各项系数</span>";
+                bars(ctx, w, h, arr.map((_, i) => "x" + i), arr, { title: "各项系数", color: css("--accent") });
+              } else {
+                const n = +root.querySelector("[data-n]").value;
+                const str = nerdamer("sum(x^k, k, 0, " + n + ")").toString();
+                const arr = new Array(n + 1).fill(1);
+                out.innerHTML = '<span class="muted">sum(x^k, k, 0, ' + n + ")</span>\n<span class=\"ok\">" + str + "</span>\n\n<span class=\"muted\">// 全 1 序列的生成函数 = 1/(1-x) 的前 " + (n + 1) + " 项</span>";
+                bars(ctx, w, h, arr.map((_, i) => "x" + i), arr, { title: "系数（全为 1）", color: css("--accent-2") });
+              }
+            } catch (e) { out.innerHTML = '<span class="err">' + e.message + "</span>"; }
+          }
+          root.querySelector("[data-op]").onchange = () => { toggle(); run(); };
+          root.querySelector("[data-run]").onclick = run; toggle(); run();
+        },
+      },
+    ],
+  };
+
+  /* ---------- Polynomial.js（rawify · 生成函数系数运算）---------- */
+  DEMOS.polynomialrw = (function () {
+    function coeffArr(poly, upto) {
+      const co = poly.coeff || {}; const a = [];
+      for (let i = 0; i <= upto; i++) a.push(Number(co[i] || 0));
+      return a;
+    }
+    return {
+      tabs: [
+        {
+          label: "系数卷积（多项式乘法）",
+          code:
+`// 多项式乘法 = 两个系数序列的「卷积」
+const A = new Polynomial('1 + 2x + 3x^2');  // 系数 [1,2,3]
+const B = new Polynomial('1 + x');          // 系数 [1,1]
+const C = A.mul(B);                         // (1+2x+3x^2)(1+x)
+C.toString();          // 1+3x+5x^2+3x^3
+C.coeff;               // {0:1,1:3,2:5,3:3}  ← 卷积结果`,
+          mount(root) {
+            const { out, viz } = skeleton(root,
+              '<div class="field"><label>多项式 A</label><input type="text" data-a value="1 + 2x + 3x^2" /></div>' +
+              '<div class="field"><label>多项式 B</label><input type="text" data-b value="1 + x" /></div>' +
+              '<div class="btn-row"><button class="btn" data-run>相乘（卷积）</button></div>',
+              { vizLabel: "乘积系数（卷积结果）" });
+            const { c, ctx, w, h } = mkCanvas(430, 260); viz.appendChild(c);
+            function run() {
+              try {
+                if (!window.Polynomial) throw new Error("Polynomial.js 未加载");
+                Polynomial.setField && Polynomial.setField("R");
+                const A = new Polynomial(root.querySelector("[data-a]").value);
+                const B = new Polynomial(root.querySelector("[data-b]").value);
+                const C = A.mul(B);
+                const deg = (C.degree ? C.degree() : Object.keys(C.coeff).reduce((m, k) => Math.max(m, +k), 0));
+                const arr = coeffArr(C, deg);
+                out.innerHTML =
+                  '<span class="k">A = </span><span class="v">' + A.toString() + '</span>\n' +
+                  '<span class="k">B = </span><span class="v">' + B.toString() + '</span>\n' +
+                  '<span class="k">A·B = </span><span class="ok">' + C.toString() + '</span>\n' +
+                  '<span class="k">系数（卷积）= </span><span class="v">[' + arr.join(", ") + ']</span>';
+                bars(ctx, w, h, arr.map((_, i) => "x" + i), arr, { title: "A·B 各次项系数", color: css("--accent") });
+              } catch (e) { out.innerHTML = '<span class="err">' + e.message + "</span>"; }
+            }
+            root.querySelector("[data-run]").onclick = run; run();
+          },
+        },
+        {
+          label: "幂级数 / 二项式系数",
+          code:
+`// (1+x)^n 的系数 = 帕斯卡三角第 n 行（二项式系数）
+const base = new Polynomial('1 + x');
+const P = base.pow(6);           // (1+x)^6
+P.toString();  // 1+6x+15x^2+20x^3+15x^4+6x^5+x^6
+P.coeff;       // {0:1,1:6,2:15,3:20,4:15,5:6,6:1}`,
+          mount(root) {
+            const { out, viz } = skeleton(root,
+              '<div class="field"><label>基多项式</label><input type="text" data-base value="1 + x" /></div>' +
+              '<div class="field"><label>幂次 n</label><div class="range-row"><input type="range" data-n min="1" max="10" value="6" /><span class="range-val" data-nv>6</span></div></div>' +
+              '<div class="btn-row"><button class="btn" data-run>展开</button></div>',
+              { vizLabel: "各次项系数（帕斯卡行）" });
+            const { c, ctx, w, h } = mkCanvas(430, 260); viz.appendChild(c);
+            root.querySelector("[data-n]").oninput = (e) => (root.querySelector("[data-nv]").textContent = e.target.value);
+            function run() {
+              try {
+                if (!window.Polynomial) throw new Error("Polynomial.js 未加载");
+                Polynomial.setField && Polynomial.setField("R");
+                const n = +root.querySelector("[data-n]").value;
+                const base = new Polynomial(root.querySelector("[data-base]").value);
+                const P = base.pow(n);
+                const deg = (P.degree ? P.degree() : Object.keys(P.coeff).reduce((m, k) => Math.max(m, +k), 0));
+                const arr = coeffArr(P, deg);
+                out.innerHTML =
+                  '<span class="k">(' + base.toString() + ')^' + n + ' =</span>\n<span class="ok">' + P.toString() + '</span>\n\n' +
+                  '<span class="k">系数 = </span><span class="v">[' + arr.join(", ") + ']</span>';
+                bars(ctx, w, h, arr.map((_, i) => "x" + i), arr, { title: "系数（帕斯卡第 " + n + " 行）", color: css("--accent-3") });
+              } catch (e) { out.innerHTML = '<span class="err">' + e.message + "</span>"; }
+            }
+            root.querySelector("[data-run]").onclick = run; run();
+          },
+        },
+        {
+          label: "分数域系数 + 求导 / 求值",
+          code:
+`// 切到有理数域 Q，系数以精确分数表示
+Polynomial.setField('Q');
+const P = new Polynomial('1/2 x^2 + 1/3 x + 1');
+P.derive().toString();   // 求导
+P.result(3);             // 在 x=3 处求值（分数）
+Polynomial.setField('R');`,
+          mount(root) {
+            const { out } = skeleton(root,
+              '<div class="field"><label>多项式（可含分数系数）</label><input type="text" data-p value="1/2 x^2 + 1/3 x + 1" /></div>' +
+              '<div class="field"><label>求值点 x =</label><input type="text" data-x value="3" /></div>' +
+              '<div class="btn-row"><button class="btn" data-run>运行（Q 域）</button></div>', { single: true });
+            function fracOf(v) { return v && v.toFraction ? v.toFraction() : String(v); }
+            function run() {
+              try {
+                if (!window.Polynomial) throw new Error("Polynomial.js 未加载");
+                if (!window.Fraction) throw new Error("需要 Fraction.js（有理数域依赖）");
+                Polynomial.setField("Q");
+                const P = new Polynomial(root.querySelector("[data-p]").value);
+                const D = P.derive();
+                const xv = root.querySelector("[data-x]").value;
+                const val = P.result(new Fraction(xv));
+                out.innerHTML =
+                  '<span class="k">P(x)  = </span><span class="v">' + P.toString() + '</span>\n' +
+                  '<span class="k">P\'(x) = </span><span class="v">' + D.toString() + '</span>\n' +
+                  '<span class="k">P(' + xv + ') = </span><span class="ok">' + fracOf(val) + '</span>  <span class="muted">(精确有理数)</span>';
+              } catch (e) { out.innerHTML = '<span class="err">' + e.message + "</span>"; }
+              finally { try { Polynomial.setField("R"); } catch (e) {} }
+            }
+            root.querySelector("[data-run]").onclick = run; run();
+          },
+        },
+        {
+          label: "组合计数：硬币找零（生成函数）",
+          code:
+`// 用生成函数数「凑出金额」的方案数
+// 每种面额 c 贡献因子 (1 + x^c + x^2c + ...)
+// 各因子相乘后，x^N 的系数 = 凑出 N 的方案数
+let G = new Polynomial('1');
+for (const c of [1, 2, 5]) {
+  let f = '1';
+  for (let k = c; k <= N; k += c) f += ' + x^' + k;
+  G = G.mul(new Polynomial(f));
+}
+G.coeff[N];   // = 凑出金额 N 的方案数`,
+          mount(root) {
+            const { out, viz } = skeleton(root,
+              '<div class="field"><label>硬币面额（逗号分隔）</label><input type="text" data-coins value="1, 2, 5" /></div>' +
+              '<div class="field"><label>目标金额 N</label><div class="range-row"><input type="range" data-n min="5" max="30" value="10" /><span class="range-val" data-nv>10</span></div></div>' +
+              '<div class="btn-row"><button class="btn" data-run>用生成函数求方案数</button></div>',
+              { vizLabel: "凑出 0…N 的方案数" });
+            const { c, ctx, w, h } = mkCanvas(430, 260); viz.appendChild(c);
+            root.querySelector("[data-n]").oninput = (e) => (root.querySelector("[data-nv]").textContent = e.target.value);
+            function run() {
+              try {
+                if (!window.Polynomial) throw new Error("Polynomial.js 未加载");
+                Polynomial.setField && Polynomial.setField("R");
+                const coins = root.querySelector("[data-coins]").value.split(",").map((s) => parseInt(s.trim(), 10)).filter((x) => x > 0);
+                const N = +root.querySelector("[data-n]").value;
+                let G = new Polynomial("1");
+                for (const cc of coins) {
+                  let f = "1";
+                  for (let k = cc; k <= N; k += cc) f += " + " + (k === 1 ? "x" : "x^" + k);
+                  G = G.mul(new Polynomial(f));
+                }
+                const arr = coeffArr(G, N);
+                out.innerHTML =
+                  '<span class="k">面额 = </span><span class="v">{' + coins.join(", ") + '}</span>\n' +
+                  '<span class="k">凑出 N=' + N + ' 的方案数 = </span><span class="ok">' + arr[N] + '</span>\n\n' +
+                  '<span class="muted">// 方案数 = 生成函数中 x^' + N + ' 的系数</span>';
+                bars(ctx, w, h, arr.map((_, i) => i), arr, { title: "凑出金额 0…" + N + " 的方案数", color: css("--accent-2") });
+              } catch (e) { out.innerHTML = '<span class="err">' + e.message + "</span>"; }
+            }
+            root.querySelector("[data-run]").onclick = run; run();
+          },
+        },
+      ],
+    };
+  })();
+
+  /* ---------- polynomium（多元 / 多变量生成函数）---------- */
+  DEMOS.polynomium = (function () {
+    function powP(pm, p, n) { let r = pm.constant(1); for (let i = 0; i < n; i++) r = pm.mul(r, p); return r; }
+    return {
+      tabs: [
+        {
+          label: "双变量生成函数 (x+y)^n",
+          code:
+`const pm = polynomium;
+const x = pm.variable('x'), y = pm.variable('y');
+let p = pm.add(x, y);            // x + y
+let P = p;
+for (let i = 1; i < n; i++) P = pm.mul(P, p);  // (x+y)^n
+pm.toString(P);   // 展开为多项式（多项系数 = 二项式系数）`,
+          mount(root) {
+            const { out } = skeleton(root,
+              '<div class="field"><label>幂次 n</label><div class="range-row"><input type="range" data-n min="1" max="6" value="3" /><span class="range-val" data-nv>3</span></div></div>' +
+              '<div class="btn-row"><button class="btn" data-run>展开 (x+y)^n</button></div>', { single: true });
+            root.querySelector("[data-n]").oninput = (e) => (root.querySelector("[data-nv]").textContent = e.target.value);
+            function run() {
+              try {
+                if (!window.polynomium) throw new Error("polynomium 未加载");
+                const pm = polynomium, n = +root.querySelector("[data-n]").value;
+                const p = pm.add(pm.variable("x"), pm.variable("y"));
+                const P = powP(pm, p, n);
+                out.innerHTML =
+                  '<span class="k">(x + y)^' + n + ' =</span>\n<span class="ok">' + pm.toString(P) + '</span>\n\n' +
+                  '<span class="muted">// 各项系数即二项式系数 C(' + n + ', k)</span>';
+              } catch (e) { out.innerHTML = '<span class="err">' + e.message + "</span>"; }
+            }
+            root.querySelector("[data-run]").onclick = run; run();
+          },
+        },
+        {
+          label: "三维计数 (x+y+z)^n",
+          code:
+`const pm = polynomium;
+const x = pm.variable('x'), y = pm.variable('y'), z = pm.variable('z');
+let base = pm.add(pm.add(x, y), z);   // x + y + z
+let P = base;
+for (let i = 1; i < n; i++) P = pm.mul(P, base);  // (x+y+z)^n
+// 展开项数 = C(n+2, 2)（三维计数 / 多项式定理）`,
+          mount(root) {
+            const { out } = skeleton(root,
+              '<div class="field"><label>幂次 n</label><div class="range-row"><input type="range" data-n min="1" max="4" value="2" /><span class="range-val" data-nv>2</span></div></div>' +
+              '<div class="btn-row"><button class="btn" data-run>展开 (x+y+z)^n</button></div>', { single: true });
+            root.querySelector("[data-n]").oninput = (e) => (root.querySelector("[data-nv]").textContent = e.target.value);
+            function run() {
+              try {
+                if (!window.polynomium) throw new Error("polynomium 未加载");
+                const pm = polynomium, n = +root.querySelector("[data-n]").value;
+                const base = pm.add(pm.add(pm.variable("x"), pm.variable("y")), pm.variable("z"));
+                const P = powP(pm, base, n);
+                const str = pm.toString(P);
+                const terms = str.split("+").length;
+                out.innerHTML =
+                  '<span class="k">(x + y + z)^' + n + ' =</span>\n<span class="ok">' + str + '</span>\n\n' +
+                  '<span class="k">展开项数 = </span><span class="v">' + terms + '</span>  <span class="muted">(= C(' + (n + 2) + ", 2) = " + ((n + 2) * (n + 1) / 2) + ")</span>";
+              } catch (e) { out.innerHTML = '<span class="err">' + e.message + "</span>"; }
+            }
+            root.querySelector("[data-run]").onclick = run; run();
+          },
+        },
+        {
+          label: "多点求值 / 代入",
+          code:
+`const pm = polynomium;
+const x = pm.variable('x'), y = pm.variable('y');
+const P = pm.mul(pm.add(x, y), pm.add(x, y));  // (x+y)^2
+pm.evaluate(P, { x: 2, y: 3 });   // = 25`,
+          mount(root) {
+            const { out } = skeleton(root,
+              '<div class="field"><label>x =</label><input type="text" data-x value="2" /></div>' +
+              '<div class="field"><label>y =</label><input type="text" data-y value="3" /></div>' +
+              '<div class="btn-row"><button class="btn" data-run>代入 (x+y)^2 求值</button></div>', { single: true });
+            function run() {
+              try {
+                if (!window.polynomium) throw new Error("polynomium 未加载");
+                const pm = polynomium;
+                const base = pm.add(pm.variable("x"), pm.variable("y"));
+                const P = pm.mul(base, base);
+                const xv = Number(root.querySelector("[data-x]").value), yv = Number(root.querySelector("[data-y]").value);
+                const val = pm.evaluate(P, { x: xv, y: yv });
+                out.innerHTML =
+                  '<span class="k">P(x,y) = </span><span class="v">' + pm.toString(P) + '</span>\n' +
+                  '<span class="k">代入 x=' + xv + ", y=" + yv + " → </span><span class=\"ok\">" + val + "</span>\n" +
+                  '<span class="muted">// 校验：(x+y)^2 = (' + xv + "+" + yv + ")^2 = " + Math.pow(xv + yv, 2) + "</span>";
+              } catch (e) { out.innerHTML = '<span class="err">' + e.message + "</span>"; }
+            }
+            root.querySelector("[data-run]").onclick = run; run();
+          },
+        },
+      ],
+    };
+  })();
+
+  /* ---------- jisg（OEIS 标准整数序列）---------- */
+  DEMOS.jisg = (function () {
+    const SEQS = [
+      { id: "A000045", name: "斐波那契 Fibonacci" },
+      { id: "A000108", name: "卡特兰 Catalan" },
+      { id: "A000041", name: "整数分拆 Partitions" },
+      { id: "A000079", name: "2 的幂 2^n" },
+      { id: "A000142", name: "阶乘 Factorial" },
+      { id: "A000217", name: "三角形数 Triangular" },
+      { id: "A000040", name: "素数 Primes" },
+      { id: "A000032", name: "卢卡斯 Lucas" },
+      { id: "A000027", name: "自然数 Naturals" },
+    ];
+    function take(id, n) {
+      const gen = window.jisg && window.jisg[id];
+      if (typeof gen !== "function") throw new Error("序列 " + id + " 不可用");
+      const it = gen(), out = [];
+      for (let i = 0; i < n; i++) out.push(it.next().value);
+      return out;
+    }
+    const opts = SEQS.map((s) => '<option value="' + s.id + '">' + s.id + " · " + s.name + "</option>").join("");
+    return {
+      tabs: [
+        {
+          label: "OEIS 序列生成",
+          code:
+`// jisg 内置 300+ 条 OEIS 序列，返回惰性生成器
+const gen = jisg.A000108();      // 卡特兰数
+const first = [];
+for (let i = 0; i < 8; i++) first.push(gen.next().value);
+// first = [1n,1n,2n,5n,14n,42n,132n,429n]（BigInt 精确）`,
+          mount(root) {
+            const { out, viz } = skeleton(root,
+              '<div class="field"><label>序列</label><select data-seq>' + opts + "</select></div>" +
+              '<div class="field"><label>项数 N</label><div class="range-row"><input type="range" data-n min="6" max="16" value="10" /><span class="range-val" data-nv>10</span></div></div>' +
+              '<div class="btn-row"><button class="btn" data-run>生成</button></div>',
+              { vizLabel: "序列前 N 项" });
+            const { c, ctx, w, h } = mkCanvas(430, 260); viz.appendChild(c);
+            root.querySelector("[data-n]").oninput = (e) => (root.querySelector("[data-nv]").textContent = e.target.value);
+            function run() {
+              try {
+                if (!window.jisg) throw new Error("jisg 未加载");
+                const id = root.querySelector("[data-seq]").value, n = +root.querySelector("[data-n]").value;
+                const arr = take(id, n);
+                out.innerHTML =
+                  '<span class="k">' + id + ' 前 ' + n + ' 项：</span>\n<span class="ok">' + arr.map(String).join(", ") + "</span>";
+                bars(ctx, w, h, arr.map((_, i) => i), arr, { title: id + " 前 " + n + " 项", color: css("--accent"), valFmt: (v) => String(v).length > 6 ? "" : String(v) });
+              } catch (e) { out.innerHTML = '<span class="err">' + e.message + "</span>"; }
+            }
+            root.querySelector("[data-seq]").onchange = run;
+            root.querySelector("[data-run]").onclick = run; run();
+          },
+        },
+        {
+          label: "验证数列（对照标准序列）",
+          code:
+`// 把自己算出的数列与 OEIS 标准序列逐项对照
+const mine = [1, 1, 2, 5, 14, 42, 132];
+const gen = jisg.A000108();
+let ok = true, at = -1;
+for (let i = 0; i < mine.length; i++) {
+  if (BigInt(mine[i]) !== gen.next().value) { ok = false; at = i; break; }
+}
+// ok=true 表示与卡特兰数完全一致`,
+          mount(root) {
+            const { out } = skeleton(root,
+              '<div class="field"><label>你的数列（逗号分隔）</label><input type="text" data-mine value="1, 1, 2, 5, 14, 42, 132" /></div>' +
+              '<div class="field"><label>对照序列</label><select data-seq>' + opts + "</select></div>" +
+              '<div class="btn-row"><button class="btn" data-run>验证</button></div>', { single: true });
+            function run() {
+              try {
+                if (!window.jisg) throw new Error("jisg 未加载");
+                const mine = root.querySelector("[data-mine]").value.split(",").map((s) => s.trim()).filter(Boolean);
+                const id = root.querySelector("[data-seq]").value;
+                const std = take(id, mine.length);
+                let ok = true, at = -1;
+                for (let i = 0; i < mine.length; i++) {
+                  if (BigInt(mine[i]) !== std[i]) { ok = false; at = i; break; }
+                }
+                if (ok) {
+                  out.innerHTML = '<span class="ok">✓ 完全匹配</span>\n<span class="muted">你的数列与 ' + id + ' 前 ' + mine.length + ' 项一致。</span>\n<span class="k">标准：</span><span class="v">' + std.map(String).join(", ") + "</span>";
+                } else {
+                  out.innerHTML = '<span class="err">✗ 第 ' + (at + 1) + ' 项不符</span>\n<span class="k">你的：</span><span class="v">' + mine[at] + '</span>\n<span class="k">标准 ' + id + '：</span><span class="ok">' + std[at] + "</span>";
+                }
+              } catch (e) { out.innerHTML = '<span class="err">' + e.message + "</span>"; }
+            }
+            root.querySelector("[data-seq]").onchange = run;
+            root.querySelector("[data-run]").onclick = run; run();
+          },
+        },
+        {
+          label: "与多项式库对照（帕斯卡行）",
+          code:
+`// 交叉验证：(1+x)^n 的系数(Polynomial.js) 应等于
+// 帕斯卡三角第 n 行(jisg A007318 按行展平)
+const P = new Polynomial('1 + x').pow(n);   // 系数即第 n 行
+const gen = jisg.A007318();                 // 1 |1,1 |1,2,1 |…
+const start = n * (n + 1) / 2;              // 第 n 行起点
+// 取 n+1 个元素与 P 的系数逐项比较`,
+          mount(root) {
+            const { out, viz } = skeleton(root,
+              '<div class="field"><label>行号 n</label><div class="range-row"><input type="range" data-n min="1" max="9" value="5" /><span class="range-val" data-nv>5</span></div></div>' +
+              '<div class="btn-row"><button class="btn" data-run>交叉验证</button></div>',
+              { vizLabel: "第 n 行二项式系数" });
+            const { c, ctx, w, h } = mkCanvas(430, 260); viz.appendChild(c);
+            root.querySelector("[data-n]").oninput = (e) => (root.querySelector("[data-nv]").textContent = e.target.value);
+            function run() {
+              try {
+                if (!window.jisg) throw new Error("jisg 未加载");
+                if (!window.Polynomial) throw new Error("Polynomial.js 未加载");
+                if (typeof window.jisg.A007318 !== "function") throw new Error("A007318 不可用");
+                const n = +root.querySelector("[data-n]").value;
+                Polynomial.setField && Polynomial.setField("R");
+                const P = new Polynomial("1 + x").pow(n);
+                const co = P.coeff || {}; const polyRow = [];
+                for (let i = 0; i <= n; i++) polyRow.push(Number(co[i] || 0));
+                const it = window.jisg.A007318(); const flat = [];
+                const need = (n + 1) * (n + 2) / 2;
+                for (let i = 0; i < need; i++) flat.push(Number(it.next().value));
+                const start = n * (n + 1) / 2;
+                const jisgRow = flat.slice(start, start + n + 1);
+                const same = polyRow.length === jisgRow.length && polyRow.every((v, i) => v === jisgRow[i]);
+                out.innerHTML =
+                  '<span class="k">(1+x)^' + n + ' 系数 (Polynomial.js)：</span>\n<span class="v">[' + polyRow.join(", ") + ']</span>\n' +
+                  '<span class="k">A007318 第 ' + n + ' 行 (jisg)：</span>\n<span class="v">[' + jisgRow.join(", ") + ']</span>\n\n' +
+                  (same ? '<span class="ok">✓ 两库结果完全一致</span>' : '<span class="err">✗ 结果不一致</span>');
+                bars(ctx, w, h, polyRow.map((_, i) => "C" + i), polyRow, { title: "帕斯卡第 " + n + " 行", color: css("--accent-3") });
+              } catch (e) { out.innerHTML = '<span class="err">' + e.message + "</span>"; }
+            }
+            root.querySelector("[data-run]").onclick = run; run();
+          },
+        },
+      ],
+    };
+  })();
 
   window.DEMOS = DEMOS;
 })();
