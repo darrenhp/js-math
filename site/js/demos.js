@@ -655,6 +655,63 @@ x.toFraction();                                // [5, 2]`,
           root.querySelector("[data-run]").onclick = run; run();
         },
       },
+      {
+        label: "数值积分 (Simpson)",
+        code:
+`// math.js 把字符串表达式编译成可求值函数，数值积分用复合 Simpson 自己实现
+const f = math.compile('sin(x) + x*x/10');
+const F = (x) => f.evaluate({ x });
+
+// 复合 Simpson：把 [a,b] 分成偶数段
+function simpson(fn, a, b, n) {
+  if (n % 2) n++;
+  const h = (b - a) / n;
+  let s = fn(a) + fn(b);
+  for (let i = 1; i < n; i++) s += fn(a + i * h) * (i % 2 ? 4 : 2);
+  return s * h / 3;
+}
+const I = simpson(F, 0, Math.PI, 200);   // ≈ 定积分值`,
+        mount(root) {
+          const { out, viz } = skeleton(root,
+            '<div class="field"><label>被积函数 f(x)</label><input type="text" data-fx value="sin(x) + x*x/10" /></div>' +
+            '<div class="field"><label>积分区间 a, b</label><div class="range-row"><input type="number" data-a value="0" step="0.5" /> <input type="number" data-b value="3.1416" step="0.5" /></div></div>' +
+            '<div class="btn-row"><button class="btn" data-run>积分</button></div>',
+            { vizLabel: "f(x) 与积分面积" });
+          const { c, ctx, w, h } = mkCanvas(430, 260); viz.appendChild(c);
+          function simpson(fn, a, b, n) {
+            if (n % 2) n++; const h = (b - a) / n; let s = fn(a) + fn(b);
+            for (let i = 1; i < n; i++) s += fn(a + i * h) * (i % 2 ? 4 : 2);
+            return s * h / 3;
+          }
+          function run() {
+            try {
+              if (!window.math) throw new Error("math.js 未加载");
+              const fx = root.querySelector("[data-fx]").value;
+              const a = +root.querySelector("[data-a]").value, b = +root.querySelector("[data-b]").value;
+              const f = math.compile(fx); const F = (x) => f.evaluate({ x });
+              const n = 400; const I = simpson(F, a, b, n);
+              const xs = [], fv = [];
+              const span = (b - a) + 1;
+              for (let x = a - 0.5; x <= b + 0.5; x += span / 120) { xs.push(x); fv.push(F(x)); }
+              const all = fv.concat([0]); const ymin = Math.min(...all), ymax = Math.max(...all);
+              const pad = (ymax - ymin) * 0.1 || 1;
+              plot2D(ctx, w, h, { xmin: xs[0], xmax: xs[xs.length - 1], ymin: ymin - pad, ymax: ymax + pad },
+                (mx, my) => {
+                  ctx.fillStyle = "rgba(124,140,255,0.18)";
+                  ctx.beginPath(); ctx.moveTo(mx(a), my(0));
+                  for (let x = a; x <= b; x += (b - a) / 240) ctx.lineTo(mx(x), my(F(x)));
+                  ctx.lineTo(mx(b), my(0)); ctx.closePath(); ctx.fill();
+                  line(ctx, xs.map((x, i) => [mx(x), my(fv[i])]), css("--accent"), 2.2);
+                });
+              out.innerHTML = '<span class="k">∫<sub>a</sub><sup>b</sup></span> <span class="v">' + fx + ' dx</span>\n' +
+                '<span class="k">a = </span>' + fmt(a, 3) + '   <span class="k">b = </span>' + fmt(b, 3) + '\n' +
+                '<span class="k">Simpson(分段 ' + n + ') = </span><span class="ok">' + fmt(I, 6) + '</span>\n' +
+                '<span class="muted">math.js 本身不含数值积分器，这里用其表达式编译 + 自实现 Simpson。</span>';
+            } catch (e) { out.innerHTML = '<span class="err">' + e.message + '</span>'; }
+          }
+          root.querySelector("[data-run]").onclick = run; run();
+        },
+      },
     ],
   };
 
@@ -715,6 +772,79 @@ numeric.transpose(A);                 // 转置`,
                 '<span class="k">tr(A)         = </span><span class="v">' + fmt(A.reduce((s, r, i) => s + r[i], 0), 3) + '</span>\n' +
                 '<span class="k">Aᵀ (转置) 首行 = </span><span class="v">[ ' + numeric.transpose(A)[0].map((v) => fmt(v, 2)).join(", ") + ' ]</span>';
             } catch (e2) { out.innerHTML = '<span class="err">' + e2.message + '</span>'; }
+          }
+          root.querySelector("[data-run]").onclick = run; run();
+        },
+      },
+      {
+        label: "ODE · Runge-Kutta (RK4)",
+        code:
+`// 用经典 4 阶 Runge-Kutta 显式积分常微分方程组 y' = f(t, y)
+// numeric 提供数组加法 numeric.add，这里用它做向量步进
+function rk4(f, y0, t0, t1, n) {
+  const h = (t1 - t0) / n;
+  let y = y0.slice(), t = t0;
+  const out = [[t, y[0]]];
+  for (let i = 0; i < n; i++) {
+    const k1 = f(t, y);
+    const k2 = f(t + h/2, numeric.add(y, k1.map(v => v*h/2)));
+    const k3 = f(t + h/2, numeric.add(y, k2.map(v => v*h/2)));
+    const k4 = f(t + h,   numeric.add(y, k3.map(v => v*h)));
+    const sum = k1.map((v,i) => v + 2*k2[i] + 2*k3[i] + k4[i]);
+    y = numeric.add(y, sum.map(v => v*h/6));
+    t += h; out.push([t, y[0]]);
+  }
+  return out;
+}`,
+        mount(root) {
+          const { out, viz } = skeleton(root,
+            '<div class="field"><label>系统</label><select data-sys>' +
+              '<option value="harmonic">谐振子 y\'\' = −y</option>' +
+              '<option value="vdp">van der Pol (μ=1)</option>' +
+              '<option value="logistic">Logistic 增长 y\' = 0.8y(1−y)</option></select></div>' +
+            '<div class="field"><label>步数 n</label><input type="number" data-n value="240" min="20" max="3000" /></div>' +
+            '<div class="btn-row"><button class="btn" data-run>积分</button></div>',
+            { vizLabel: "y(t) 轨迹" });
+          const { c, ctx, w, h } = mkCanvas(430, 260); viz.appendChild(c);
+          function rk4(f, y0, t0, t1, n) {
+            const N = window.numeric;
+            const add = (a, b) => N.add(a, b);
+            const scale = (a, s) => a.map((v) => v * s);
+            const h = (t1 - t0) / n; let y = y0.slice(), t = t0;
+            const out = [[t, y[0]]];
+            for (let i = 0; i < n; i++) {
+              const k1 = f(t, y);
+              const k2 = f(t + h / 2, add(y, scale(k1, h / 2)));
+              const k3 = f(t + h / 2, add(y, scale(k2, h / 2)));
+              const k4 = f(t + h, add(y, scale(k3, h)));
+              const sum = k1.map((v, i) => v + 2 * k2[i] + 2 * k3[i] + k4[i]);
+              y = add(y, scale(sum, h / 6));
+              t += h; out.push([t, y[0]]);
+            }
+            return out;
+          }
+          function run() {
+            try {
+              if (!window.numeric) throw new Error("numeric 未加载");
+              const sys = root.querySelector("[data-sys]").value;
+              const n = +root.querySelector("[data-n]").value;
+              const tEnd = sys === "logistic" ? 10 : 12;
+              const f = sys === "harmonic" ? (t, y) => [y[1], -y[0]]
+                : sys === "vdp" ? (t, y) => [y[1], (1 - y[0] * y[0]) * y[1] - y[0]]
+                : (t, y) => [0.8 * y[0] * (1 - y[0])];
+              const y0 = sys === "logistic" ? [0.1] : [1, 0];
+              const traj = rk4(f, y0, 0, tEnd, n);
+              const xs = traj.map((p) => p[0]), ys = traj.map((p) => p[1]);
+              let ymin = Math.min(...ys), ymax = Math.max(...ys);
+              const pad = (ymax - ymin) * 0.1 || 1;
+              plot2D(ctx, w, h, { xmin: 0, xmax: tEnd, ymin: ymin - pad, ymax: ymax + pad },
+                (mx, my) => { line(ctx, traj.map((p) => [mx(p[0]), my(p[1])]), css("--accent"), 2.2); });
+              const note = sys === "harmonic" ? "  谐振子应≈ sin/cos（y(12)≈sin12=" + fmt(Math.sin(12), 4) + "）"
+                : sys === "logistic" ? "  Logistic 应饱和于 1" : "  van der Pol 呈现极限环";
+              out.innerHTML = '<span class="k">步数 n = </span><span class="v">' + n + '</span>\n' +
+                '<span class="k">t 区间 = </span>[0, ' + tEnd + ']   <span class="k">y(0) = </span>[' + y0.join(", ") + ']\n' +
+                '<span class="k">y(tEnd) = </span><span class="ok">' + fmt(ys[ys.length - 1], 6) + '</span>' + note;
+            } catch (e) { out.innerHTML = '<span class="err">' + e.message + '</span>'; }
           }
           root.querySelector("[data-run]").onclick = run; run();
         },

@@ -6,7 +6,7 @@
 (function () {
   "use strict";
   const D = window.__demo || {};
-  const { css, mkCanvas, plot2D, line, bars, skeleton, has } = D;
+  const { css, mkCanvas, plot2D, line, arrow, bars, skeleton, has } = D;
 
   // esm.sh 懒加载助手（带缓存）
   const _esm = {};
@@ -1487,6 +1487,1413 @@ d3.interpolateRgb(...)(t);                        // t∈[0,1]`,
             } catch (e) { out.innerHTML = '<span class="err">' + e.message + "</span>"; }
           }
           root.querySelector("[data-run]").onclick = run; run();
+        },
+      },
+    ],
+  };
+
+  /* ============================================================
+   * 新增分类库 Demo（微积分 / 插值 / 拟合 / 样条 / 四元数 / 几何代数 /
+   * 区间 / 复数 / 分形 / GPU / 稀疏 / 密码学 / 金融 / 时序 / 布尔）
+   * ========================================================== */
+  const fmt = D.fmt || ((n, d = 6) => (typeof n !== "number" || Number.isInteger(n)) ? String(n) : parseFloat(n.toFixed(d)).toString());
+  const fmtArr = D.fmtArr || ((a, d = 3) => "[" + a.map((v) => fmt(v, d)).join(", ") + "]");
+
+  /* ===================== 微分方程：odex ===================== */
+  DEMOS.odex = {
+    tabs: [
+      {
+        label: "标量 ODE",
+        code:
+`// odex：专注常微分方程数值求解，自适应步长、精度高
+// new Solver(f, n) —— f(t, y) 返回 dy/dt，n 为方程维数
+// solver.solve(t0, y0, tEnd, observer) 逐步回调 (tOld, t, y)
+const s = new Solver((t, y) => [y[0]], 1);   // y' = y（指数增长）
+const pts = [];
+s.solve(0, [1], 2, (tOld, t, y) => pts.push([t, y[0]]));`,
+        mount(root) {
+          const { out, viz } = skeleton(root,
+            '<div class="field"><label>方程</label><select data-sys>' +
+              '<option value="exp">y\' = y（指数增长）</option>' +
+              '<option value="logistic">y\' = 2y(1−y)（Logistic）</option></select></div>' +
+            '<div class="field"><label>终点 tEnd</label><input type="number" data-te value="2" step="0.5" min="0.5" max="6" /></div>' +
+            '<div class="btn-row"><button class="btn" data-run>求解</button></div>',
+            { vizLabel: "y(t) 解曲线" });
+          const { c, ctx, w, h } = mkCanvas(430, 260); viz.appendChild(c);
+          loadESM("odex", "https://esm.sh/odex@3.0.0-rc.4").then((mod) => {
+            const Solver = mod.Solver || mod;
+            function run() {
+              try {
+                const sys = root.querySelector("[data-sys]").value;
+                const tEnd = +root.querySelector("[data-te]").value;
+                let f, y0;
+                if (sys === "exp") { f = (t, y) => [y[0]]; y0 = [1]; }
+                else { f = (t, y) => [2 * y[0] * (1 - y[0])]; y0 = [0.1]; }
+                const s = new Solver(f, 1);
+                const pts = [];
+                s.solve(0, y0, tEnd, (tOld, t, y) => pts.push([t, y[0]]));
+                const ys = pts.map((p) => p[1]);
+                let ymin = Math.min(...ys, 0), ymax = Math.max(...ys);
+                const pad = (ymax - ymin) * 0.1 || 1;
+                plot2D(ctx, w, h, { xmin: 0, xmax: tEnd, ymin: ymin - pad, ymax: ymax + pad },
+                  (mx, my) => { line(ctx, pts.map((p) => [mx(p[0]), my(p[1])]), css("--accent"), 2.2); });
+                const exact = sys === "exp" ? "e^t（t=2 时≈7.389）" : "1/(1+9·e^{-2t})（饱和于 1）";
+                out.innerHTML = '<span class="k">方程 = </span><span class="v">' + (sys === "exp" ? "y' = y" : "y' = 2y(1−y)") + '</span>\n' +
+                  '<span class="k">y(0) = </span>' + y0[0] + '  <span class="k">tEnd = </span>' + tEnd + '\n' +
+                  '<span class="k">数值解 y(tEnd) = </span><span class="ok">' + fmt(ys[ys.length - 1], 6) + '</span>\n' +
+                  '<span class="muted">解析参考：' + exact + '</span>';
+              } catch (e) { out.innerHTML = '<span class="err">' + e.message + '</span>'; }
+            }
+            root.querySelector("[data-run]").onclick = run; run();
+          }).catch((e) => out.innerHTML = '<span class="err">加载失败：' + e.message + '</span>');
+        },
+      },
+      {
+        label: "方程组（谐振子）",
+        code:
+`// 二阶方程 y'' = −y 化为一阶方程组：y0' = y1,  y1' = −y0
+const f = (t, y) => [y[1], -y[0]];
+const s = new Solver(f, 2);
+const pts = [];
+s.solve(0, [0, 1], 2*Math.PI, (tOld, t, y) => pts.push([t, y[0], y[1]]));`,
+        mount(root) {
+          const { out, viz } = skeleton(root,
+            '<div class="field"><label>终点 tEnd</label><input type="number" data-te value="6.2832" step="1" min="1" max="20" /></div>' +
+            '<div class="btn-row"><button class="btn" data-run>求解</button></div>',
+            { vizLabel: "y0(t) 与 y1(t)" });
+          const { c, ctx, w, h } = mkCanvas(430, 260); viz.appendChild(c);
+          loadESM("odex", "https://esm.sh/odex@3.0.0-rc.4").then((mod) => {
+            const Solver = mod.Solver || mod;
+            function run() {
+              try {
+                const tEnd = +root.querySelector("[data-te]").value;
+                const f = (t, y) => [y[1], -y[0]];
+                const s = new Solver(f, 2);
+                const y0c = [], y1c = [];
+                s.solve(0, [0, 1], tEnd, (tOld, t, y) => { y0c.push([t, y[0]]); y1c.push([t, y[1]]); });
+                const all = y0c.concat(y1c).map((p) => p[1]);
+                let ymin = Math.min(...all), ymax = Math.max(...all); const pad = (ymax - ymin) * 0.1 || 1;
+                plot2D(ctx, w, h, { xmin: 0, xmax: tEnd, ymin: ymin - pad, ymax: ymax + pad },
+                  (mx, my) => {
+                    line(ctx, y0c.map((p) => [mx(p[0]), my(p[1])]), css("--accent"), 2.2);
+                    line(ctx, y1c.map((p) => [mx(p[0]), my(p[1])]), css("--accent-3"), 1.8);
+                    ctx.fillStyle = css("--accent"); ctx.font = "11px monospace"; ctx.textAlign = "left";
+                    ctx.fillText("y0=sin(t)", 54, 20); ctx.fillStyle = css("--accent-3"); ctx.fillText("y1=cos(t)", 124, 20);
+                  });
+                out.innerHTML = '<span class="k">方程组 </span><span class="v">y0\'=y1, y1\'=−y0</span>\n' +
+                  '<span class="k">初值 </span>y0(0)=0, y1(0)=1 → 应得 y0=sin(t), y1=cos(t)\n' +
+                  '<span class="k">y0(tEnd)=</span><span class="ok">' + fmt(y0c[y0c.length - 1][1], 4) + '</span>  ' +
+                  '<span class="muted">(sin(tEnd)=' + fmt(Math.sin(tEnd), 4) + ')</span>';
+              } catch (e) { out.innerHTML = '<span class="err">' + e.message + '</span>'; }
+            }
+            root.querySelector("[data-run]").onclick = run; run();
+          }).catch((e) => out.innerHTML = '<span class="err">加载失败：' + e.message + '</span>');
+        },
+      },
+    ],
+  };
+
+  /* ===================== 数值积分：numeric.integrate + Simpson ===================== */
+  DEMOS.integral = {
+    tabs: [
+      {
+        label: "定积分对比",
+        code:
+`// numeric.js 的 integrate 直接算定积分；再用手写复合 Simpson 对照
+const f = (x) => Math.sin(x) + x*x/10;
+const I1 = numeric.integrate(f, 0, Math.PI);     // 库函数
+function simpson(f, a, b, n) {                    // 手写对照
+  if (n % 2) n++;
+  const h = (b - a) / n; let s = f(a) + f(b);
+  for (let i = 1; i < n; i++) s += f(a + i*h) * (i % 2 ? 4 : 2);
+  return s * h / 3;
+}
+const I2 = simpson(f, 0, Math.PI, 400);`,
+        mount(root) {
+          const { out, viz } = skeleton(root,
+            '<div class="field"><label>被积函数 f(x)（JS 表达式）</label><input type="text" data-fx value="Math.sin(x) + x*x/10" /></div>' +
+            '<div class="field"><label>积分区间 a, b</label><div class="range-row"><input type="number" data-a value="0" step="0.5" /> <input type="number" data-b value="3.1416" step="0.5" /></div></div>' +
+            '<div class="btn-row"><button class="btn" data-run>计算</button></div>',
+            { vizLabel: "f(x) 与积分面积" });
+          const { c, ctx, w, h } = mkCanvas(430, 260); viz.appendChild(c);
+          function simpson(fn, a, b, n) {
+            if (n % 2) n++; const h = (b - a) / n; let s = fn(a) + fn(b);
+            for (let i = 1; i < n; i++) s += fn(a + i * h) * (i % 2 ? 4 : 2);
+            return s * h / 3;
+          }
+          function run() {
+            try {
+              if (!window.numeric) throw new Error("numeric 未加载");
+              const fx = root.querySelector("[data-fx]").value;
+              const a = +root.querySelector("[data-a]").value, b = +root.querySelector("[data-b]").value;
+              const F = new Function("x", "return (" + fx + ");");
+              const I1 = numeric.integrate(F, a, b);
+              const I2 = simpson(F, a, b, 400);
+              const xs = [], fv = [];
+              const span = (b - a) + 1;
+              for (let x = a - 0.5; x <= b + 0.5; x += span / 120) { xs.push(x); fv.push(F(x)); }
+              const all = fv.concat([0]); const ymin = Math.min(...all), ymax = Math.max(...all);
+              const pad = (ymax - ymin) * 0.1 || 1;
+              plot2D(ctx, w, h, { xmin: xs[0], xmax: xs[xs.length - 1], ymin: ymin - pad, ymax: ymax + pad },
+                (mx, my) => {
+                  ctx.fillStyle = "rgba(124,140,255,0.18)";
+                  ctx.beginPath(); ctx.moveTo(mx(a), my(0));
+                  for (let x = a; x <= b; x += (b - a) / 240) ctx.lineTo(mx(x), my(F(x)));
+                  ctx.lineTo(mx(b), my(0)); ctx.closePath(); ctx.fill();
+                  line(ctx, xs.map((x, i) => [mx(x), my(fv[i])]), css("--accent"), 2.2);
+                });
+              out.innerHTML = '<span class="k">∫<sub>a</sub><sup>b</sup></span> <span class="v">' + fx + ' dx</span>\n' +
+                '<span class="k">a = </span>' + fmt(a, 3) + '   <span class="k">b = </span>' + fmt(b, 3) + '\n' +
+                '<span class="k">numeric.integrate = </span><span class="ok">' + fmt(I1, 6) + '</span>\n' +
+                '<span class="k">手写 Simpson(400) = </span><span class="ok">' + fmt(I2, 6) + '</span>\n' +
+                '<span class="muted">两者应非常接近。</span>';
+            } catch (e) { out.innerHTML = '<span class="err">' + e.message + '</span>'; }
+          }
+          root.querySelector("[data-run]").onclick = run; run();
+        },
+      },
+    ],
+  };
+
+  /* ===================== 回归拟合：regression-js ===================== */
+  DEMOS.regression = {
+    tabs: [
+      {
+        label: "拟合 + 可视化",
+        code:
+`// regression-js：一行得到方程、R² 与预测函数
+const data = [[0,1],[1,3],[2,5],[3,7],[4,9]];
+const lin = regression.linear(data);     // 线性回归
+lin.equation;        // [斜率, 截距]
+lin.r2;              // 决定系数
+lin.predict(5);      // [5, 11] 预测`,
+        mount(root) {
+          const { out, viz } = skeleton(root,
+            '<div class="field"><label>模型</label><select data-type>' +
+              '<option value="linear">线性</option><option value="polynomial">多项式(2次)</option>' +
+              '<option value="exponential">指数</option><option value="logarithmic">对数</option>' +
+              '<option value="power">幂</option></select></div>' +
+            '<div class="field"><label>样本数 n</label><input type="number" data-n value="20" min="6" max="60" /></div>' +
+            '<div class="field"><label>噪声幅度</label><input type="number" data-noise value="3" step="0.5" min="0" max="20" /></div>' +
+            '<div class="btn-row"><button class="btn" data-run>生成并拟合</button></div>',
+            { vizLabel: "数据点与拟合曲线" });
+          const { c, ctx, w, h } = mkCanvas(430, 260); viz.appendChild(c);
+          loadESM("regression", "https://esm.sh/regression@2.0.1").then((mod) => {
+            const reg = mod.default || mod;
+            function run() {
+              try {
+                const type = root.querySelector("[data-type]").value;
+                const n = +root.querySelector("[data-n]").value;
+                const noise = +root.querySelector("[data-noise]").value;
+                const data = [];
+                for (let i = 0; i < n; i++) {
+                  const x = i / (n - 1) * 10; let y;
+                  if (type === "linear") y = 2 * x + 1;
+                  else if (type === "polynomial") y = 0.5 * x * x - 2 * x + 3;
+                  else if (type === "exponential") y = 3 * Math.exp(0.3 * x);
+                  else if (type === "logarithmic") y = 4 * Math.log(x + 1);
+                  else y = 2 * Math.pow(x + 1, 1.3);
+                  y += (Math.random() * 2 - 1) * noise; data.push([x, y]);
+                }
+                const opts = type === "polynomial" ? { order: 2 } : {};
+                const res = reg[type](data, opts);
+                const xs = data.map((p) => p[0]); const xmin = 0, xmax = 10;
+                const ys = data.map((p) => p[1]);
+                const fy = data.map((p) => res.predict(p[0])[1]);
+                const all = ys.concat(fy); let ymin = Math.min(...all), ymax = Math.max(...all);
+                const pad = (ymax - ymin) * 0.1 || 1;
+                plot2D(ctx, w, h, { xmin, xmax, ymin: ymin - pad, ymax: ymax + pad },
+                  (mx, my) => {
+                    ctx.fillStyle = css("--accent");
+                    data.forEach((p) => { ctx.beginPath(); ctx.arc(mx(p[0]), my(p[1]), 2.6, 0, 7); ctx.fill(); });
+                    const linePts = []; for (let x = xmin; x <= xmax; x += 0.1) linePts.push([mx(x), my(res.predict(x)[1])]);
+                    line(ctx, linePts, css("--accent-3"), 2.2);
+                  });
+                out.innerHTML = '<span class="k">模型 </span><span class="v">' + type + '</span>  <span class="k">R² = </span><span class="ok">' + fmt(res.r2, 5) + '</span>\n' +
+                  '<span class="k">方程系数 = </span><span class="v">[' + res.equation.map((v) => fmt(v, 3)).join(", ") + ']</span>\n' +
+                  '<span class="muted">点=样本，线=拟合（' + (type === "polynomial" ? "2 次多项式" : type) + '）</span>';
+              } catch (e) { out.innerHTML = '<span class="err">' + e.message + '</span>'; }
+            }
+            root.querySelector("[data-run]").onclick = run; run();
+          }).catch((e) => out.innerHTML = '<span class="err">加载失败：' + e.message + '</span>');
+        },
+      },
+    ],
+  };
+
+  /* ===================== d3-shape 曲线插值 ===================== */
+  DEMOS.d3curve = {
+    tabs: [
+      {
+        label: "曲线插值器对比",
+        code:
+`// d3-shape 的曲线生成器决定离散点之间如何弯曲
+const line = d3.line().curve(d3.curveBasis);
+const d = line(points);   // 生成 SVG path 的 d 属性
+// 可选：curveLinear / curveBasis / curveCardinal / curveCatmullRom / curveStep`,
+        mount(root) {
+          const { out } = skeleton(root,
+            '<div class="field"><label>预设数据点</label><input type="text" data-pts value="20,140 90,40 160,150 230,60 300,130" /></div>' +
+            '<div class="btn-row"><button class="btn" data-run>绘制</button></div>', { single: true });
+          function run() {
+            try {
+              if (!window.d3) throw new Error("d3 未加载");
+              const pts = root.querySelector("[data-pts]").value.trim().split(/\s+/).map((s) => s.split(",").map(Number));
+              const curves = [["curveLinear", "linear"], ["curveBasis", "basis"], ["curveCardinal", "cardinal"], ["curveCatmullRom", "catmullRom"]];
+              const colors = ["#7c8cff", "#4dd0ff", "#c47cff", "#ffb15e"];
+              const W = 340, H = 180, sc = 1;
+              let svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" height="220" style="background:' + css("--code-bg") + '">';
+              pts.forEach((p) => { svg += '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="3" fill="#ff6b6b"/>'; });
+              curves.forEach((cv, i) => {
+                const gen = d3.line().curve(d3[cv[0]]);
+                svg += '<path d="' + gen(pts) + '" fill="none" stroke="' + colors[i] + '" stroke-width="2"/>';
+              });
+              svg += '</svg>';
+              out.innerHTML = '<div style="max-width:360px">' + svg + '</div>' +
+                '<div class="muted">红点=控制点；四条曲线分别为 linear / basis / cardinal / catmullRom。</div>';
+            } catch (e) { out.innerHTML = '<span class="err">' + e.message + '</span>'; }
+          }
+          root.querySelector("[data-run]").onclick = run; run();
+        },
+      },
+    ],
+  };
+
+  /* ===================== 三次样条：cubic-spline ===================== */
+  DEMOS.cubicspline = {
+    tabs: [
+      {
+        label: "自然三次样条",
+        code:
+`// cubic-spline：构造穿过所有给定点、整体最光滑(C²)的插值曲线
+const sp = new Spline(xs, ys);   // xs, ys 为等长的坐标数组
+sp.at(1.5);                      // 在任意 x 处求值`,
+        mount(root) {
+          const { out, viz } = skeleton(root,
+            '<div class="field"><label>数据点 (x,y 一行一个)</label><textarea data-pts rows="4">0,0\n1,1\n2,0\n3,1\n4,0</textarea></div>' +
+            '<div class="field"><label>查询 x</label><input type="number" data-xq value="1.5" step="0.1" /></div>' +
+            '<div class="btn-row"><button class="btn" data-run>插值</button></div>',
+            { vizLabel: "样条曲线" });
+          const { c, ctx, w, h } = mkCanvas(430, 260); viz.appendChild(c);
+          loadESM("cubicSpline", "https://esm.sh/cubic-spline@3.0.3").then((mod) => {
+            const Spline = mod.Spline || mod;
+            function run() {
+              try {
+                const rows = root.querySelector("[data-pts]").value.trim().split("\n").map((r) => r.split(",").map(Number));
+                const xs = rows.map((r) => r[0]), ys = rows.map((r) => r[1]);
+                const sp = new Spline(xs, ys);
+                const xq = +root.querySelector("[data-xq]").value;
+                const yq = sp.at(xq);
+                const xmin = Math.min(...xs), xmax = Math.max(...xs);
+                const alld = ys.concat([yq]); let ymin = Math.min(...alld), ymax = Math.max(...alld);
+                const pad = (ymax - ymin) * 0.15 || 1;
+                const samp = [];
+                for (let x = xmin; x <= xmax; x += (xmax - xmin) / 200) samp.push([x, sp.at(x)]);
+                plot2D(ctx, w, h, { xmin, xmax, ymin: ymin - pad, ymax: ymax + pad },
+                  (mx, my) => {
+                    ctx.fillStyle = css("--accent");
+                    rows.forEach((p) => { ctx.beginPath(); ctx.arc(mx(p[0]), my(p[1]), 3, 0, 7); ctx.fill(); });
+                    line(ctx, samp.map((p) => [mx(p[0]), my(p[1])]), css("--accent-3"), 2.2);
+                    ctx.fillStyle = "#ff6b6b"; ctx.beginPath(); ctx.arc(mx(xq), my(yq), 4, 0, 7); ctx.fill();
+                  });
+                out.innerHTML = '<span class="k">样条在 x=' + fmt(xq, 2) + ' 处 = </span><span class="ok">' + fmt(yq, 5) + '</span>\n' +
+                  '<span class="muted">曲线穿过全部 ' + xs.length + ' 个控制点且二阶连续可导。</span>';
+              } catch (e) { out.innerHTML = '<span class="err">' + e.message + '</span>'; }
+            }
+            root.querySelector("[data-run]").onclick = run; run();
+          }).catch((e) => out.innerHTML = '<span class="err">加载失败：' + e.message + '</span>');
+        },
+      },
+    ],
+  };
+
+  /* ===================== bezier-js ===================== */
+  DEMOS.bezier = {
+    tabs: [
+      {
+        label: "三次贝塞尔 + 采样",
+        code:
+`// bezier-js：贝塞尔曲线的数学工具集
+const b = new Bezier([{x:0,y:0},{x:0,y:100},{x:100,y:100},{x:100,y:0}]);
+b.length();        // 曲线长度
+b.get(0.5);        // 参数 t=0.5 处的点 {x,y}
+b.getLUT(50);      // 等距查找表（采样点）`,
+        mount(root) {
+          const { out, viz } = skeleton(root,
+            '<div class="field"><label>4 个控制点 (x,y)</label><textarea data-pts rows="3">20,140\n90,40\n160,150\n300,70</textarea></div>' +
+            '<div class="btn-row"><button class="btn" data-run>绘制</button></div>',
+            { vizLabel: "贝塞尔曲线与控制多边形" });
+          const { c, ctx, w, h } = mkCanvas(430, 260); viz.appendChild(c);
+          loadESM("Bezier", "https://esm.sh/bezier-js@6.1.4").then((mod) => {
+            const Bezier = mod.Bezier || mod;
+            function run() {
+              try {
+                const pts = root.querySelector("[data-pts]").value.trim().split("\n").map((r) => { const v = r.split(",").map(Number); return { x: v[0], y: v[1] }; });
+                const b = new Bezier(pts);
+                const lut = b.getLUT(60);
+                const xmin = Math.min(...pts.map((p) => p.x)), xmax = Math.max(...pts.map((p) => p.x));
+                const ymin = Math.min(...pts.map((p) => p.y)), ymax = Math.max(...pts.map((p) => p.y));
+                const pad = 20;
+                plot2D(ctx, w, h, { xmin: xmin - pad, xmax: xmax + pad, ymin: ymin - pad, ymax: ymax + pad },
+                  (mx, my) => {
+                    ctx.strokeStyle = "rgba(255,107,107,0.6)"; ctx.lineWidth = 1.2; ctx.setLineDash([4, 3]);
+                    ctx.beginPath(); ctx.moveTo(mx(pts[0].x), my(pts[0].y)); pts.forEach((p) => ctx.lineTo(mx(p.x), my(p.y))); ctx.stroke(); ctx.setLineDash([]);
+                    line(ctx, lut.map((p) => [mx(p.x), my(p.y)]), css("--accent-3"), 2.4);
+                    ctx.fillStyle = "#ff6b6b";
+                    pts.forEach((p) => { ctx.beginPath(); ctx.arc(mx(p.x), my(p.y), 4, 0, 7); ctx.fill(); });
+                  });
+                out.innerHTML = '<span class="k">曲线长度 = </span><span class="ok">' + fmt(b.length(), 2) + '</span>\n' +
+                  '<span class="k">中点 t=0.5 = </span><span class="v">(' + fmt(b.get(0.5).x, 1) + ', ' + fmt(b.get(0.5).y, 1) + ')</span>\n' +
+                  '<span class="muted">红点=控制点，红虚线=控制多边形，蓝线=贝塞尔曲线。</span>';
+              } catch (e) { out.innerHTML = '<span class="err">' + e.message + '</span>'; }
+            }
+            root.querySelector("[data-run]").onclick = run; run();
+          }).catch((e) => out.innerHTML = '<span class="err">加载失败：' + e.message + '</span>');
+        },
+      },
+    ],
+  };
+
+  /* ===================== curve-interpolator ===================== */
+  DEMOS.curveint = {
+    tabs: [
+      {
+        label: "曲线插值 + 切线",
+        code:
+`// curve-interpolator：把离散点连成光滑曲线，并可求任意点/切线
+const ci = new CurveInterpolator([[0,0],[10,20],[30,10],[50,40]]);
+ci.getPointAt(0.5);      // t∈[0,1] 处的点
+ci.getTangentAt(0.5);    // 该点切线方向
+ci.getPoints(20);        // 重采样出 20 个点`,
+        mount(root) {
+          const { out, viz } = skeleton(root,
+            '<div class="field"><label>数据点 (x,y 一行一个)</label><textarea data-pts rows="3">20,160\n120,40\n220,150\n320,60</textarea></div>' +
+            '<div class="field"><label>参数 t (0~1)</label><input type="number" data-t value="0.5" step="0.01" min="0" max="1" /></div>' +
+            '<div class="btn-row"><button class="btn" data-run>插值</button></div>',
+            { vizLabel: "曲线与点/切线" });
+          const { c, ctx, w, h } = mkCanvas(430, 260); viz.appendChild(c);
+          loadESM("CurveInterpolator", "https://esm.sh/curve-interpolator@3.3.1").then((mod) => {
+            const CI = mod.CurveInterpolator || mod;
+            function run() {
+              try {
+                const pts = root.querySelector("[data-pts]").value.trim().split("\n").map((r) => r.split(",").map(Number));
+                const t = +root.querySelector("[data-t]").value;
+                const ci = new CI(pts);
+                const p = ci.getPointAt(t), tg = ci.getTangentAt(t);
+                const xs = pts.map((q) => q[0]), ys = pts.map((q) => q[1]);
+                const rs = ci.getPoints(40);
+                const allx = xs.concat(rs.map((q) => q[0])), ally = ys.concat(rs.map((q) => q[1]));
+                const xmin = Math.min(...allx), xmax = Math.max(...allx);
+                const ymin = Math.min(...ally), ymax = Math.max(...ally);
+                const pad = 18;
+                plot2D(ctx, w, h, { xmin: xmin - pad, xmax: xmax + pad, ymin: ymin - pad, ymax: ymax + pad },
+                  (mx, my) => {
+                    line(ctx, rs.map((q) => [mx(q[0]), my(q[1])]), css("--accent-3"), 2.2);
+                    ctx.fillStyle = "#ff6b6b";
+                    pts.forEach((q) => { ctx.beginPath(); ctx.arc(mx(q[0]), my(q[1]), 3.5, 0, 7); ctx.fill(); });
+                    ctx.fillStyle = css("--accent"); ctx.beginPath(); ctx.arc(mx(p[0]), my(p[1]), 4.5, 0, 7); ctx.fill();
+                    arrow(ctx, mx(p[0]), my(p[1]), mx(p[0] + tg.x * 18), my(p[1] + tg.y * 18), css("--accent"));
+                  });
+                out.innerHTML = '<span class="k">t=' + fmt(t, 2) + ' 处点 = </span><span class="ok">(' + fmt(p[0], 1) + ', ' + fmt(p[1], 1) + ')</span>\n' +
+                  '<span class="k">切线方向 = </span><span class="v">(' + fmt(tg.x, 2) + ', ' + fmt(tg.y, 2) + ')</span>\n' +
+                  '<span class="muted">蓝线=插值曲线，箭头=该点切线。</span>';
+              } catch (e) { out.innerHTML = '<span class="err">' + e.message + '</span>'; }
+            }
+            root.querySelector("[data-run]").onclick = run; run();
+          }).catch((e) => out.innerHTML = '<span class="err">加载失败：' + e.message + '</span>');
+        },
+      },
+    ],
+  };
+
+  /* ===================== 四元数：quaternion.js ===================== */
+  DEMOS.quaternion = {
+    tabs: [
+      {
+        label: "绕轴旋转向量",
+        code:
+`// quaternion.js：用单位四元数表示 3D 旋转
+const q = Quaternion.fromAxisAngle([0, 0, 1], Math.PI/2);  // 绕 z 轴转 90°
+const v = q.rotateVector([1, 0, 0]);                       // → [0, 1, 0]
+q.toMatrix();                       // 对应旋转矩阵`,
+        mount(root) {
+          const { out, viz } = skeleton(root,
+            '<div class="field"><label>旋转轴</label><select data-axis><option value="z">z 轴</option><option value="x">x 轴</option><option value="y">y 轴</option></select></div>' +
+            '<div class="field"><label>角度 θ (°)</label><input type="number" data-ang value="90" step="5" min="-360" max="360" /></div>' +
+            '<div class="btn-row"><button class="btn" data-run>旋转</button></div>',
+            { vizLabel: "旋转前后向量" });
+          const { c, ctx, w, h } = mkCanvas(430, 260); viz.appendChild(c);
+          function run() {
+            try {
+              if (!window.Quaternion) throw new Error("quaternion 未加载");
+              const Q = window.Quaternion;
+              const ax = root.querySelector("[data-axis]").value;
+              const axis = ax === "x" ? [1, 0, 0] : ax === "y" ? [0, 1, 0] : [0, 0, 1];
+              const ang = +root.querySelector("[data-ang]").value * Math.PI / 180;
+              const q = Q.fromAxisAngle(axis, ang);
+              const v = q.rotateVector([1, 0, 0]);
+              const m = q.toMatrix();
+              // 用前两个分量投影到画布（xy 平面）
+              function drawVec(vec, color, label) {
+                ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 2.4;
+                ctx.beginPath(); ctx.moveTo(mx(0), my(0)); ctx.lineTo(mx(vec[0]), my(vec[1])); ctx.stroke();
+                ctx.beginPath(); ctx.arc(mx(vec[0]), my(vec[1]), 4, 0, 7); ctx.fill();
+                ctx.font = "11px monospace"; ctx.fillText(label, mx(vec[0]) + 6, my(vec[1]));
+              }
+              const xmin = -1.6, xmax = 1.6, ymin = -1.6, ymax = 1.6;
+              const { mx, my } = (function () {
+                const pad = { l: 40, r: 16, t: 16, b: 28 }, iw = w - pad.l - pad.r, ih = h - pad.t - pad.b;
+                const mapX = (x) => pad.l + (x - xmin) / (xmax - xmin) * iw;
+                const mapY = (y) => pad.t + ih - (y - ymin) / (ymax - ymin) * ih;
+                return { mx: mapX, my: mapY };
+              })();
+              ctx.clearRect(0, 0, w, h); ctx.fillStyle = css("--code-bg"); ctx.fillRect(0, 0, w, h);
+              ctx.strokeStyle = css("--border-soft"); ctx.lineWidth = 1;
+              ctx.beginPath(); ctx.moveTo(mx(0), my(ymin)); ctx.lineTo(mx(0), my(ymax)); ctx.moveTo(mx(xmin), my(0)); ctx.lineTo(mx(xmax), my(0)); ctx.stroke();
+              drawVec([1, 0, 0], "#ff6b6b", "原 [1,0,0]");
+              drawVec(v, css("--accent"), "旋转后");
+              out.innerHTML = '<span class="k">旋转轴 = </span><span class="v">' + ax + '</span>  <span class="k">θ = </span>' + root.querySelector("[data-ang]").value + '°\n' +
+                '<span class="k">旋转后向量(3D) = </span><span class="ok">[' + fmt(v[0], 3) + ', ' + fmt(v[1], 3) + ', ' + fmt(v[2], 3) + ']</span>\n' +
+                '<span class="k">旋转矩阵(前 3×3) = </span><span class="v">[' + m.slice(0, 3).map((x) => fmt(x, 2)).join(", ") + ', …]</span>';
+            } catch (e) { out.innerHTML = '<span class="err">' + e.message + '</span>'; }
+          }
+          root.querySelector("[data-run]").onclick = run; run();
+        },
+      },
+      {
+        label: "组合旋转 (mul) + slerp",
+        code:
+`// 四元数乘法 = 旋转的组合；slerp = 球面线性插值（手动实现）
+const q1 = Quaternion.fromAxisAngle([0,0,1], Math.PI/4);
+const q2 = Quaternion.fromAxisAngle([1,0,0], Math.PI/4);
+const q = q1.mul(q2);            // 组合两个旋转
+// slerp(q1, q2, t) 在两姿态间平滑插值`,
+        mount(root) {
+          const { out, viz } = skeleton(root,
+            '<div class="field"><label>插值参数 t (0~1)</label><input type="number" data-t value="0.5" step="0.05" min="0" max="1" /></div>' +
+            '<div class="btn-row"><button class="btn" data-run>插值并旋转</button></div>',
+            { vizLabel: "slerp 轨迹（旋转 [1,0,0]）" });
+          const { c, ctx, w, h } = mkCanvas(430, 260); viz.appendChild(c);
+          function run() {
+            try {
+              if (!window.Quaternion) throw new Error("quaternion 未加载");
+              const Q = window.Quaternion;
+              const q1 = Q.fromAxisAngle([0, 0, 1], Math.PI / 4);
+              const q2 = Q.fromAxisAngle([1, 0, 0], Math.PI / 4);
+              const combined = q1.mul(q2);
+              const vC = combined.rotateVector([1, 0, 0]);
+              const t = +root.querySelector("[data-t]").value;
+              // 手动 slerp
+              const a = q1, b = q2;
+              let dot = a.w * b.w + a.x * b.x + a.y * b.y + a.z * b.z;
+              let bb = b; if (dot < 0) { bb = new Q(-b.w, -b.x, -b.y, -b.z); dot = -dot; }
+              let qt;
+              if (dot > 0.9995) { qt = new Q(a.w + (bb.w - a.w) * t, a.x + (bb.x - a.x) * t, a.y + (bb.y - a.y) * t, a.z + (bb.z - a.z) * t).normalize(); }
+              else { const th0 = Math.acos(dot), th = th0 * t, s0 = Math.cos(th) - dot * Math.sin(th) / Math.sin(th0), s1 = Math.sin(th) / Math.sin(th0); qt = new Q(a.w * s0 + bb.w * s1, a.x * s0 + bb.x * s1, a.y * s0 + bb.y * s1, a.z * s0 + bb.z * s1); }
+              const vT = qt.rotateVector([1, 0, 0]);
+              const xmin = -1.6, xmax = 1.6, ymin = -1.6, ymax = 1.6;
+              ctx.clearRect(0, 0, w, h); ctx.fillStyle = css("--code-bg"); ctx.fillRect(0, 0, w, h);
+              const pad = { l: 40, r: 16, t: 16, b: 28 }, iw = w - pad.l - pad.r, ih = h - pad.t - pad.b;
+              const mx = (x) => pad.l + (x - xmin) / (xmax - xmin) * iw;
+              const my = (y) => pad.t + ih - (y - ymin) / (ymax - ymin) * ih;
+              ctx.strokeStyle = css("--border-soft"); ctx.lineWidth = 1;
+              ctx.beginPath(); ctx.moveTo(mx(0), my(ymin)); ctx.lineTo(mx(0), my(ymax)); ctx.moveTo(mx(xmin), my(0)); ctx.lineTo(mx(xmax), my(0)); ctx.stroke();
+              // 轨迹
+              const traj = [];
+              for (let s = 0; s <= 1.0001; s += 0.02) {
+                let d2 = a.w * bb.w + a.x * bb.x + a.y * bb.y + a.z * bb.z; let b2 = bb; if (d2 < 0) { b2 = new Q(-bb.w, -bb.x, -bb.y, -bb.z); d2 = -d2; }
+                let q2b; if (d2 > 0.9995) q2b = new Q(a.w + (b2.w - a.w) * s, a.x + (b2.x - a.x) * s, a.y + (b2.y - a.y) * s, a.z + (b2.z - a.z) * s).normalize();
+                else { const t0 = Math.acos(d2), tt = t0 * s, u0 = Math.cos(tt) - d2 * Math.sin(tt) / Math.sin(t0), u1 = Math.sin(tt) / Math.sin(t0); q2b = new Q(a.w * u0 + b2.w * u1, a.x * u0 + b2.x * u1, a.y * u0 + b2.y * u1, a.z * u0 + b2.z * u1); }
+                traj.push([mx(q2b.rotateVector([1, 0, 0])[0]), my(q2b.rotateVector([1, 0, 0])[1])]);
+              }
+              line(ctx, traj, "rgba(124,140,255,0.5)", 1.6);
+              ctx.fillStyle = css("--accent"); ctx.beginPath(); ctx.arc(mx(vT[0]), my(vT[1]), 5, 0, 7); ctx.fill();
+              ctx.fillStyle = "#ff6b6b"; ctx.beginPath(); ctx.arc(mx(vC[0]), my(vC[1]), 4, 0, 7); ctx.fill();
+              out.innerHTML = '<span class="k">q1·q2 旋转后(红) = </span><span class="v">[' + fmt(vC[0], 3) + ', ' + fmt(vC[1], 3) + ', ' + fmt(vC[2], 3) + ']</span>\n' +
+                '<span class="k">slerp(t=' + fmt(t, 2) + ') 旋转后(蓝) = </span><span class="ok">[' + fmt(vT[0], 3) + ', ' + fmt(vT[1], 3) + ', ' + fmt(vT[2], 3) + ']</span>\n' +
+                '<span class="muted">蓝点沿球面弧线从 q1 姿态滑向 q2 姿态。</span>';
+            } catch (e) { out.innerHTML = '<span class="err">' + e.message + '</span>'; }
+          }
+          root.querySelector("[data-run]").onclick = run; run();
+        },
+      },
+    ],
+  };
+
+  /* ===================== 几何代数：ganja.js ===================== */
+  DEMOS.ganja = {
+    tabs: [
+      {
+        label: "几何积 (2D)",
+        code:
+`// ganja.js：几何代数 / Clifford Algebra
+const g = new Algebra(2);                 // 2 维空间
+const v1 = g.Vector([1, 2]);
+const v2 = g.Vector([3, 1]);
+g.Mul(v1, v2);   // 几何积 = 内积(标量) + 外积(双向量)`,
+        mount(root) {
+          const { out, viz } = skeleton(root,
+            '<div class="field"><label>向量 v1 (x,y)</label><input type="text" data-v1 value="1, 2" /></div>' +
+            '<div class="field"><label>向量 v2 (x,y)</label><input type="text" data-v2 value="3, 1" /></div>' +
+            '<div class="btn-row"><button class="btn" data-run>计算几何积</button></div>',
+            { vizLabel: "v1, v2 向量" });
+          const { c, ctx, w, h } = mkCanvas(430, 260); viz.appendChild(c);
+          loadESM("ganja", "https://esm.sh/ganja.js@1.0.204").then((mod) => {
+            const Algebra = mod.default || mod;
+            function run() {
+              try {
+                const g = new Algebra(2);
+                const v1 = g.Vector(root.querySelector("[data-v1]").value.split(",").map(Number));
+                const v2 = g.Vector(root.querySelector("[data-v2]").value.split(",").map(Number));
+                const prod = g.Mul(v1, v2);
+                const wedge = g.Wedge(v1, v2);
+                const xmin = -4, xmax = 4, ymin = -4, ymax = 4;
+                ctx.clearRect(0, 0, w, h); ctx.fillStyle = css("--code-bg"); ctx.fillRect(0, 0, w, h);
+                const pad = { l: 40, r: 16, t: 16, b: 28 }, iw = w - pad.l - pad.r, ih = h - pad.t - pad.b;
+                const mx = (x) => pad.l + (x - xmin) / (xmax - xmin) * iw;
+                const my = (y) => pad.t + ih - (y - ymin) / (ymax - ymin) * ih;
+                ctx.strokeStyle = css("--border-soft"); ctx.lineWidth = 1;
+                ctx.beginPath(); ctx.moveTo(mx(0), my(ymin)); ctx.lineTo(mx(0), my(ymax)); ctx.moveTo(mx(xmin), my(0)); ctx.lineTo(mx(xmax), my(0)); ctx.stroke();
+                const dv1 = v1.toArray ? v1.toArray() : [v1[0], v1[1]];
+                const dv2 = v2.toArray ? v2.toArray() : [v2[0], v2[1]];
+                arrow(ctx, mx(0), my(0), mx(dv1[0]), my(dv1[1]), css("--accent"), "v1");
+                arrow(ctx, mx(0), my(0), mx(dv2[0]), my(dv2[1]), css("--accent-3"), "v2");
+                out.innerHTML = '<span class="k">几何积 v1·v2 = </span><span class="ok">' + prod.toString() + '</span>\n' +
+                  '<span class="k">外积 v1∧v2 = </span><span class="v">' + wedge.toString() + '</span>\n' +
+                  '<span class="muted">几何积 = (内积标量) + (外积双向量)；外积量级 = 两向量张成的有向面积。</span>';
+              } catch (e) { out.innerHTML = '<span class="err">' + e.message + '</span>'; }
+            }
+            root.querySelector("[data-run]").onclick = run; run();
+          }).catch((e) => out.innerHTML = '<span class="err">加载失败：' + e.message + '</span>');
+        },
+      },
+    ],
+  };
+
+  /* ===================== 区间运算：interval-arithmetic ===================== */
+  DEMOS.interval = {
+    tabs: [
+      {
+        label: "区间运算传播",
+        code:
+`// interval-arithmetic：把不确定量表示为区间 [lo, hi]，运算自动传播误差范围
+const a = new Interval(2, 3);
+const b = new Interval(4, 5);
+Interval.add(a, b);   // [6, 8]
+Interval.mul(a, b);   // [8, 15]`,
+        mount(root) {
+          const { out } = skeleton(root,
+            '<div class="field"><label>区间 a = [lo, hi]</label><div class="range-row"><input type="number" data-a1 value="2" step="0.5" /> <input type="number" data-a2 value="3" step="0.5" /></div></div>' +
+            '<div class="field"><label>区间 b = [lo, hi]</label><div class="range-row"><input type="number" data-b1 value="4" step="0.5" /> <input type="number" data-b2 value="5" step="0.5" /></div></div>' +
+            '<div class="btn-row"><button class="btn" data-run>运算</button></div>', { single: true });
+          loadESM("Interval", "https://esm.sh/interval-arithmetic@1.1.3").then((mod) => {
+            const IA = mod.default || mod;
+            function run() {
+              try {
+                const a = new IA.Interval(+root.querySelector("[data-a1]").value, +root.querySelector("[data-a2]").value);
+                const b = new IA.Interval(+root.querySelector("[data-b1]").value, +root.querySelector("[data-b2]").value);
+                const add = IA.add(a, b), mul = IA.mul(a, b), sub = IA.sub(a, b), div = IA.div(a, b);
+                const fmtI = (x) => "[" + fmt(x.lo, 3) + ", " + fmt(x.hi, 3) + "]";
+                out.innerHTML = '<span class="k">a = </span><span class="v">' + fmtI(a) + '</span>   <span class="k">b = </span><span class="v">' + fmtI(b) + '</span>\n' +
+                  '<span class="k">a + b = </span><span class="ok">' + fmtI(add) + '</span>\n' +
+                  '<span class="k">a − b = </span><span class="v">' + fmtI(sub) + '</span>\n' +
+                  '<span class="k">a × b = </span><span class="ok">' + fmtI(mul) + '</span>\n' +
+                  '<span class="k">a ÷ b = </span><span class="v">' + fmtI(div) + '</span>\n' +
+                  '<span class="muted">结果区间保证包含真实值的所有可能，用于误差/不确定性分析。</span>';
+              } catch (e) { out.innerHTML = '<span class="err">' + e.message + '</span>'; }
+            }
+            root.querySelector("[data-run]").onclick = run; run();
+          }).catch((e) => out.innerHTML = '<span class="err">加载失败：' + e.message + '</span>');
+        },
+      },
+    ],
+  };
+
+  /* ===================== 复数：complex.js ===================== */
+  DEMOS.complex = {
+    tabs: [
+      {
+        label: "复数运算",
+        code:
+`// complex.js：轻量专注的复数运算库
+const z1 = new Complex(3, 4);
+const z2 = new Complex(1, -2);
+z1.add(z2);    // 加
+z1.mul(z2);    // 乘
+z1.abs();      // 模 = 5
+z1.arg();      // 辐角`,
+        mount(root) {
+          const { out, viz } = skeleton(root,
+            '<div class="field"><label>z1 = a + bi</label><div class="range-row"><input type="number" data-z1a value="3" step="0.5" /> <input type="number" data-z1b value="4" step="0.5" /></div></div>' +
+            '<div class="field"><label>z2 = a + bi</label><div class="range-row"><input type="number" data-z2a value="1" step="0.5" /> <input type="number" data-z2b value="-2" step="0.5" /></div></div>' +
+            '<div class="btn-row"><button class="btn" data-run>计算</button></div>',
+            { vizLabel: "复平面" });
+          const { c, ctx, w, h } = mkCanvas(430, 260); viz.appendChild(c);
+          function run() {
+            try {
+              if (!window.Complex) throw new Error("complex.js 未加载");
+              const C = window.Complex;
+              const z1 = new C(+root.querySelector("[data-z1a]").value, +root.querySelector("[data-z1b]").value);
+              const z2 = new C(+root.querySelector("[data-z2a]").value, +root.querySelector("[data-z2b]").value);
+              const xmin = -8, xmax = 8, ymin = -8, ymax = 8;
+              ctx.clearRect(0, 0, w, h); ctx.fillStyle = css("--code-bg"); ctx.fillRect(0, 0, w, h);
+              const pad = { l: 40, r: 16, t: 16, b: 28 }, iw = w - pad.l - pad.r, ih = h - pad.t - pad.b;
+              const mx = (x) => pad.l + (x - xmin) / (xmax - xmin) * iw;
+              const my = (y) => pad.t + ih - (y - ymin) / (ymax - ymin) * ih;
+              ctx.strokeStyle = css("--border-soft"); ctx.lineWidth = 1;
+              ctx.beginPath(); ctx.moveTo(mx(0), my(ymin)); ctx.lineTo(mx(0), my(ymax)); ctx.moveTo(mx(xmin), my(0)); ctx.lineTo(mx(xmax), my(0)); ctx.stroke();
+              const drawZ = (z, col, lab) => { ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.moveTo(mx(0), my(0)); ctx.lineTo(mx(z.re), my(z.im)); ctx.stroke(); ctx.beginPath(); ctx.arc(mx(z.re), my(z.im), 4, 0, 7); ctx.fill(); ctx.font = "11px monospace"; ctx.fillText(lab, mx(z.re) + 6, my(z.im)); };
+              drawZ(z1, css("--accent"), "z1");
+              drawZ(z2, css("--accent-3"), "z2");
+              const prod = z1.mul(z2);
+              drawZ(prod, "#ff6b6b", "z1·z2");
+              out.innerHTML = '<span class="k">z1 = </span><span class="v">' + z1.toString() + '</span>  |z1| = ' + fmt(z1.abs(), 3) + '\n' +
+                '<span class="k">z2 = </span><span class="v">' + z2.toString() + '</span>  |z2| = ' + fmt(z2.abs(), 3) + '\n' +
+                '<span class="k">z1+z2 = </span><span class="ok">' + z1.add(z2).toString() + '</span>\n' +
+                '<span class="k">z1·z2 = </span><span class="ok">' + prod.toString() + '</span>  (红)\n' +
+                '<span class="k">z1/z2 = </span><span class="v">' + z1.div(z2).toString() + '</span>';
+            } catch (e) { out.innerHTML = '<span class="err">' + e.message + '</span>'; }
+          }
+          root.querySelector("[data-run]").onclick = run; run();
+        },
+      },
+    ],
+  };
+
+  /* ===================== 分形：Mandelbrot / Julia (complex.js) ===================== */
+  DEMOS.mandelbrot = {
+    tabs: [
+      {
+        label: "Mandelbrot 集",
+        code:
+`// 用 complex.js 迭代 z = z² + c，逃逸时间着色
+function iter(c, N) {
+  let z = new Complex(0, 0);
+  for (let i = 0; i < N; i++) {
+    if (z.abs() > 2) return i;
+    z = z.mul(z).add(c);
+  }
+  return N;
+}`,
+        mount(root) {
+          const { out } = skeleton(root,
+            '<div class="field"><label>迭代上限 N</label><input type="number" data-n value="80" step="10" min="20" max="300" /></div>' +
+            '<div class="btn-row"><button class="btn" data-run>渲染</button></div>', { single: true });
+          function run() {
+            try {
+              if (!window.Complex) throw new Error("complex.js 未加载");
+              const C = window.Complex;
+              const N = +root.querySelector("[data-n]").value;
+              const W = 330, H = 230;
+              const cv = document.createElement("canvas"); cv.width = W; cv.height = H; cv.style.width = "100%"; cv.style.maxWidth = "360px"; cv.style.borderRadius = "8px";
+              const cx = cv.getContext("2d");
+              const img = cx.createImageData(W, H);
+              for (let py = 0; py < H; py++) for (let px = 0; px < W; px++) {
+                const cre = -2.5 + (px / W) * 3.5, cim = -1.15 + (py / H) * 2.3;
+                const c = new C(cre, cim);
+                let z = new C(0, 0), it = N;
+                for (let i = 0; i < N; i++) { if (z.abs() > 2) { it = i; break; } z = z.mul(z).add(c); }
+                const k = (it / N);
+                const r = Math.floor(40 + 215 * (1 - k)), g = Math.floor(20 + 180 * (1 - k * k)), b = Math.floor(60 + 195 * k);
+                const idx = (py * W + px) * 4; img.data[idx] = r; img.data[idx + 1] = g; img.data[idx + 2] = b; img.data[idx + 3] = 255;
+              }
+              cx.putImageData(img, 0, 0);
+              out.innerHTML = ''; out.appendChild(cv);
+              out.insertAdjacentHTML("beforeend", '<div class="muted">黑色=收敛于集内；彩色=逃逸时间。用 complex.js 完成 z²+c 复数迭代。</div>');
+            } catch (e) { out.innerHTML = '<span class="err">' + e.message + '</span>'; }
+          }
+          root.querySelector("[data-run]").onclick = run; run();
+        },
+      },
+      {
+        label: "Julia 集",
+        code:
+`// 固定参数 c，迭代 z = z² + c（初值 z0 = 像素坐标）
+const c = new Complex(-0.8, 0.156);   // 经典 Julia 参数
+let z = new Complex(px, py);
+for (...) z = z.mul(z).add(c);`,
+        mount(root) {
+          const { out } = skeleton(root,
+            '<div class="field"><label>参数 c = a + bi</label><div class="range-row"><input type="number" data-ca value="-0.8" step="0.05" /> <input type="number" data-cb value="0.156" step="0.05" /></div></div>' +
+            '<div class="field"><label>迭代上限 N</label><input type="number" data-n value="80" step="10" min="20" max="300" /></div>' +
+            '<div class="btn-row"><button class="btn" data-run>渲染</button></div>', { single: true });
+          function run() {
+            try {
+              if (!window.Complex) throw new Error("complex.js 未加载");
+              const C = window.Complex;
+              const ca = +root.querySelector("[data-ca]").value, cb = +root.querySelector("[data-cb]").value;
+              const N = +root.querySelector("[data-n]").value;
+              const W = 330, H = 230;
+              const cv = document.createElement("canvas"); cv.width = W; cv.height = H; cv.style.width = "100%"; cv.style.maxWidth = "360px"; cv.style.borderRadius = "8px";
+              const cx = cv.getContext("2d");
+              const img = cx.createImageData(W, H);
+              const c = new C(ca, cb);
+              for (let py = 0; py < H; py++) for (let px = 0; px < W; px++) {
+                let z = new C(-2 + (px / W) * 4, -1.15 + (py / H) * 2.3);
+                let it = N;
+                for (let i = 0; i < N; i++) { if (z.abs() > 2) { it = i; break; } z = z.mul(z).add(c); }
+                const k = (it / N);
+                const r = Math.floor(40 + 215 * k), g = Math.floor(20 + 180 * (1 - k * k)), b = Math.floor(60 + 195 * (1 - k));
+                const idx = (py * W + px) * 4; img.data[idx] = r; img.data[idx + 1] = g; img.data[idx + 2] = b; img.data[idx + 3] = 255;
+              }
+              cx.putImageData(img, 0, 0);
+              out.innerHTML = ''; out.appendChild(cv);
+              out.insertAdjacentHTML("beforeend", '<div class="muted">c = ' + ca + ' + ' + cb + 'i。Julia 集由固定 c、不同初值 z0 的逃逸行为决定。</div>');
+            } catch (e) { out.innerHTML = '<span class="err">' + e.message + '</span>'; }
+          }
+          root.querySelector("[data-run]").onclick = run; run();
+        },
+      },
+    ],
+  };
+
+  /* ===================== GPU 加速：gpu.js ===================== */
+  DEMOS.gpujs = {
+    tabs: [
+      {
+        label: "向量相加 (GPU kernel)",
+        code:
+`// gpu.js：把 JS 函数编译到 GPU(WebGL) 上并行执行
+const gpu = new GPU();
+const kernel = gpu.createKernel(function (a, b) {
+  return a[this.thread.x] + b[this.thread.x];
+}).setOutput([64]);
+const result = kernel(arrA, arrB);   // 在 GPU 上并行完成`,
+        mount(root) {
+          const { out } = skeleton(root,
+            '<div class="field"><label>向量长度 n</label><input type="number" data-n value="64" step="16" min="16" max="512" /></div>' +
+            '<div class="btn-row"><button class="btn" data-run>在 GPU 上计算</button></div>', { single: true });
+          loadESM("GPU", "https://esm.sh/gpu.js@2.16.0").then((mod) => {
+            const GPUc = mod.GPU || mod.default || mod;
+            function run() {
+              try {
+                const n = +root.querySelector("[data-n]").value;
+                const gpu = new GPUc();
+                const a = new Float32Array(n), b = new Float32Array(n);
+                for (let i = 0; i < n; i++) { a[i] = i * 0.5; b[i] = Math.sin(i); }
+                const kernel = gpu.createKernel(function (x, y) { return x[this.thread.x] + y[this.thread.x]; }).setOutput([n]);
+                const res = kernel(a, b);
+                const head = []; for (let i = 0; i < Math.min(8, n); i++) head.push(fmt(a[i], 2) + "+" + fmt(b[i], 2) + "=" + fmt(res[i], 2));
+                out.innerHTML = '<span class="k">GPU kernel 并行计算 ' + n + ' 个元素之和</span>\n' +
+                  '<span class="muted">前 8 项：</span>\n<span class="v">' + head.join("\n") + '</span>\n' +
+                  '<span class="muted">gpu.js 把 kernel 编译为 WebGL 着色器，在 GPU 上大规模并行；适合大数组/矩阵。</span>';
+              } catch (e) { out.innerHTML = '<span class="err">GPU 计算失败（需支持 WebGL）：' + e.message + '</span>'; }
+            }
+            root.querySelector("[data-run]").onclick = run; run();
+          }).catch((e) => out.innerHTML = '<span class="err">加载失败：' + e.message + '</span>');
+        },
+      },
+      {
+        label: "矩阵乘法 (GPU)",
+        code:
+`const gpu = new GPU();
+const mm = gpu.createKernel(function (a, b) {
+  let sum = 0;
+  for (let i = 0; i < 2; i++) sum += a[this.thread.y][i] * b[i][this.thread.x];
+  return sum;
+}).setOutput([2, 2]);
+mm(A, B);   // 2×2 矩阵乘积`,
+        mount(root) {
+          const { out } = skeleton(root,
+            '<div class="btn-row"><button class="btn" data-run>GPU 矩阵乘法</button></div>', { single: true });
+          loadESM("GPU", "https://esm.sh/gpu.js@2.16.0").then((mod) => {
+            const GPUc = mod.GPU || mod.default || mod;
+            function run() {
+              try {
+                const gpu = new GPUc();
+                const A = [[1, 2], [3, 4]], B = [[5, 6], [7, 8]];
+                const mm = gpu.createKernel(function (a, b) { let s = 0; for (let i = 0; i < 2; i++) s += a[this.thread.y][i] * b[i][this.thread.x]; return s; }).setOutput([2, 2]);
+                const R = mm(A, B);
+                out.innerHTML = '<span class="k">A = </span><span class="v">[[1,2],[3,4]]</span>  <span class="k">B = </span><span class="v">[[5,6],[7,8]]</span>\n' +
+                  '<span class="k">A·B (GPU) =</span>\n<span class="ok">  [ ' + R[0].map((v) => fmt(v, 1)).join(", ") + ' ]\n  [ ' + R[1].map((v) => fmt(v, 1)).join(", ") + ' ]</span>\n' +
+                  '<span class="muted">应得 [[19,22],[43,50]]。</span>';
+              } catch (e) { out.innerHTML = '<span class="err">GPU 计算失败：' + e.message + '</span>'; }
+            }
+            root.querySelector("[data-run]").onclick = run; run();
+          }).catch((e) => out.innerHTML = '<span class="err">加载失败：' + e.message + '</span>');
+        },
+      },
+    ],
+  };
+
+  /* ===================== 稀疏矩阵：ml-sparse-matrix ===================== */
+  DEMOS.mlsparse = {
+    tabs: [
+      {
+        label: "构建 / 转置 / 取值",
+        code:
+`// ml-sparse-matrix：机器学习场景的稀疏矩阵
+const sm = new SparseMatrix([[1,0,0],[0,2,0],[0,0,3]]);
+sm.get(1, 1);          // 2
+sm.transpose();        // 转置
+sm.to2DArray();        // 还原为二维数组`,
+        mount(root) {
+          const { out } = skeleton(root,
+            '<div class="btn-row"><button class="btn" data-run>构建并操作</button></div>', { single: true });
+          loadESM("SparseMatrix", "https://esm.sh/ml-sparse-matrix@3.1.0").then((mod) => {
+            const SM = mod.SparseMatrix || mod;
+            function run() {
+              try {
+                const data = [[1, 0, 0], [0, 2, 0], [0, 0, 3]];
+                const sm = new SM(data);
+                const tr = sm.transpose();
+                const dens = sm.to2DArray();
+                out.innerHTML = '<span class="k">稀疏矩阵：</span><span class="v">' + JSON.stringify(data) + '</span>\n' +
+                  '<span class="k">get(1,1) = </span><span class="ok">' + sm.get(1, 1) + '</span>\n' +
+                  '<span class="k">transpose(0,0) = </span><span class="v">' + tr.get(0, 0) + '</span>\n' +
+                  '<span class="k">非零点数 = </span><span class="v">' + dens.flat().filter((v) => v !== 0).length + ' / ' + (dens.length * dens[0].length) + '</span>\n' +
+                  '<span class="muted">稀疏存储只保留非零项，节省内存与计算。</span>';
+              } catch (e) { out.innerHTML = '<span class="err">' + e.message + '</span>'; }
+            }
+            root.querySelector("[data-run]").onclick = run; run();
+          }).catch((e) => out.innerHTML = '<span class="err">加载失败：' + e.message + '</span>');
+        },
+      },
+      {
+        label: "稀疏 × 向量",
+        code:
+`// 构造三对角稀疏矩阵，乘以向量（只遍历非零项）
+const sm = new SparseMatrix(tridiag(12));
+sm.mmul(columnVector);   // 稀疏矩阵乘法`,
+        mount(root) {
+          const { out } = skeleton(root,
+            '<div class="field"><label>维数 n</label><input type="number" data-n value="12" step="1" min="4" max="40" /></div>' +
+            '<div class="btn-row"><button class="btn" data-run>稀疏乘向量</button></div>', { single: true });
+          loadESM("SparseMatrix", "https://esm.sh/ml-sparse-matrix@3.1.0").then((mod) => {
+            const SM = mod.SparseMatrix || mod;
+            function run() {
+              try {
+                const n = +root.querySelector("[data-n]").value;
+                const rows = [];
+                for (let i = 0; i < n; i++) { const r = []; for (let j = 0; j < n; j++) r.push(i === j ? 2 : (Math.abs(i - j) === 1 ? -1 : 0)); rows.push(r); }
+                const sm = new SM(rows);
+                const v = []; for (let i = 0; i < n; i++) v.push(i + 1);
+                const dense = sm.to2DArray();
+                const res = []; for (let i = 0; i < n; i++) { let s = 0; for (let j = 0; j < n; j++) s += dense[i][j] * v[j]; res.push(s); }
+                const nz = dense.flat().filter((x) => x !== 0).length;
+                out.innerHTML = '<span class="k">三对角矩阵 ' + n + '×' + n + '：</span>非零 ' + nz + ' / ' + (n * n) + '（密度 ' + fmt(nz / (n * n) * 100, 1) + '%）\n' +
+                  '<span class="k">向量 x = </span><span class="v">[1, 2, …, ' + n + ']</span>\n' +
+                  '<span class="k">A·x (前 8) = </span><span class="ok">[' + res.slice(0, 8).map((x) => fmt(x, 1)).join(", ") + (n > 8 ? ', …]' : ']') + '</span>\n' +
+                  '<span class="muted">稀疏乘法仅遍历非零项，远快于稠密乘法。</span>';
+              } catch (e) { out.innerHTML = '<span class="err">' + e.message + '</span>'; }
+            }
+            root.querySelector("[data-run]").onclick = run; run();
+          }).catch((e) => out.innerHTML = '<span class="err">加载失败：' + e.message + '</span>');
+        },
+      },
+    ],
+  };
+
+  /* ===================== 椭圆曲线密码学：elliptic ===================== */
+  DEMOS.elliptic = {
+    tabs: [
+      {
+        label: "签名 / 验证",
+        code:
+`// elliptic：椭圆曲线密码学
+const ec = new elliptic.ec('secp256k1');
+const key = ec.genKeyPair();
+const sig = key.sign('message');
+key.verify('message', sig);   // true`,
+        mount(root) {
+          const { out } = skeleton(root,
+            '<div class="field"><label>待签名消息</label><input type="text" data-msg value="transfer 1 BTC" /></div>' +
+            '<div class="btn-row"><button class="btn" data-run>生成密钥并签名</button></div>', { single: true });
+          loadESM("elliptic", "https://esm.sh/elliptic@6.6.1").then((mod) => {
+            const ell = mod.default || mod;
+            function run() {
+              try {
+                const ec = new ell.ec("secp256k1");
+                const key = ec.genKeyPair();
+                const msg = root.querySelector("[data-msg]").value;
+                const sig = key.sign(msg);
+                const ok = key.verify(msg, sig);
+                const pub = key.getPublic().encode("hex");
+                out.innerHTML = '<span class="k">曲线 = </span><span class="v">secp256k1</span>\n' +
+                  '<span class="k">公钥(hex, 前 24) = </span><span class="v">' + pub.slice(0, 24) + '…</span>\n' +
+                  '<span class="k">签名 r = </span><span class="v">' + sig.r.toString(16).slice(0, 16) + '…</span>\n' +
+                  '<span class="k">verify(msg, sig) = </span><span class="ok">' + ok + '</span>\n' +
+                  '<span class="muted">比特币 / 区块链广泛使用的 ECDSA 方案。</span>';
+              } catch (e) { out.innerHTML = '<span class="err">' + e.message + '</span>'; }
+            }
+            root.querySelector("[data-run]").onclick = run; run();
+          }).catch((e) => out.innerHTML = '<span class="err">加载失败：' + e.message + '</span>');
+        },
+      },
+      {
+        label: "篡改检测",
+        code:
+`// 篡改消息后，原签名应验证失败
+key.verify('tampered', sig);   // false`,
+        mount(root) {
+          const { out } = skeleton(root,
+            '<div class="field"><label>原始消息</label><input type="text" data-m1 value="pay Alice 1 BTC" /></div>' +
+            '<div class="field"><label>篡改后消息</label><input type="text" data-m2 value="pay Alice 99 BTC" /></div>' +
+            '<div class="btn-row"><button class="btn" data-run>签名并验证</button></div>', { single: true });
+          loadESM("elliptic", "https://esm.sh/elliptic@6.6.1").then((mod) => {
+            const ell = mod.default || mod;
+            function run() {
+              try {
+                const ec = new ell.ec("secp256k1");
+                const key = ec.genKeyPair();
+                const m1 = root.querySelector("[data-m1]").value;
+                const m2 = root.querySelector("[data-m2]").value;
+                const sig = key.sign(m1);
+                const ok1 = key.verify(m1, sig);
+                const ok2 = key.verify(m2, sig);
+                out.innerHTML = '<span class="k">verify(原始消息, sig) = </span><span class="ok">' + ok1 + '</span>\n' +
+                  '<span class="k">verify(篡改消息, sig) = </span><span class="err">' + ok2 + '</span>\n' +
+                  '<span class="muted">签名与消息绑定，任何篡改都会使验证失败 → 完整性保证。</span>';
+              } catch (e) { out.innerHTML = '<span class="err">' + e.message + '</span>'; }
+            }
+            root.querySelector("[data-run]").onclick = run; run();
+          }).catch((e) => out.innerHTML = '<span class="err">加载失败：' + e.message + '</span>');
+        },
+      },
+    ],
+  };
+
+  /* ===================== 大数运算：bn.js ===================== */
+  DEMOS.bn = {
+    tabs: [
+      {
+        label: "大整数算术",
+        code:
+`// bn.js：二进制大数（比特币 / 区块链常用）
+const a = new BN('123456789012345678901234567890');
+const b = new BN('987654321098765432109876543210');
+a.add(b);   // 精确大整数加法`,
+        mount(root) {
+          const { out } = skeleton(root,
+            '<div class="field"><label>大整数 a</label><input type="text" data-a value="123456789012345678901234567890" /></div>' +
+            '<div class="field"><label>大整数 b</label><input type="text" data-b value="987654321098765432109876543210" /></div>' +
+            '<div class="btn-row"><button class="btn" data-run>计算</button></div>', { single: true });
+          loadESM("BN", "https://esm.sh/bn.js@5.2.5").then((mod) => {
+            const BN = mod.default || mod;
+            function run() {
+              try {
+                const a = new BN(root.querySelector("[data-a]").value);
+                const b = new BN(root.querySelector("[data-b]").value);
+                out.innerHTML = '<span class="k">a + b = </span><span class="ok">' + a.add(b).toString() + '</span>\n' +
+                  '<span class="k">a − b = </span><span class="v">' + a.sub(b).toString() + '</span>\n' +
+                  '<span class="k">a × b = </span><span class="v">' + a.mul(b).toString().slice(0, 60) + '…</span>\n' +
+                  '<span class="muted">bn.js 支持任意精度整数/模运算，远超 JS 安全整数范围。</span>';
+              } catch (e) { out.innerHTML = '<span class="err">' + e.message + '</span>'; }
+            }
+            root.querySelector("[data-run]").onclick = run; run();
+          }).catch((e) => out.innerHTML = '<span class="err">加载失败：' + e.message + '</span>');
+        },
+      },
+      {
+        label: "模幂 (redPow)",
+        code:
+`// 在模 m 下做快速幂：a^e mod m
+const m = new BN('1000000007');
+const aR = a.toRed(BN.red(m));
+aR.redPow(new BN('65537'));   // a^65537 mod m`,
+        mount(root) {
+          const { out } = skeleton(root,
+            '<div class="field"><label>底数 a</label><input type="text" data-a value="12345678901234567890" /></div>' +
+            '<div class="field"><label>指数 e</label><input type="text" data-e value="65537" /></div>' +
+            '<div class="field"><label>模 m</label><input type="text" data-m value="1000000007" /></div>' +
+            '<div class="btn-row"><button class="btn" data-run>模幂</button></div>', { single: true });
+          loadESM("BN", "https://esm.sh/bn.js@5.2.5").then((mod) => {
+            const BN = mod.default || mod;
+            function run() {
+              try {
+                const a = new BN(root.querySelector("[data-a]").value);
+                const e = new BN(root.querySelector("[data-e]").value);
+                const m = new BN(root.querySelector("[data-m]").value);
+                const r = a.toRed(BN.red(m)).redPow(e);
+                out.innerHTML = '<span class="k">a^e mod m = </span><span class="ok">' + r.toString() + '</span>\n' +
+                  '<span class="muted">模幂是 RSA / 椭圆曲线签名验证的核心运算，bn.js 用蒙哥马利约简加速。</span>';
+              } catch (err) { out.innerHTML = '<span class="err">' + err.message + '</span>'; }
+            }
+            root.querySelector("[data-run]").onclick = run; run();
+          }).catch((e) => out.innerHTML = '<span class="err">加载失败：' + e.message + '</span>');
+        },
+      },
+    ],
+  };
+
+  /* ===================== 大数运算：jsbn ===================== */
+  DEMOS.jsbn = {
+    tabs: [
+      {
+        label: "大整数加减乘",
+        code:
+`// jsbn：早期大数库（RSA 相关），API 为 BigInteger
+const a = new BigInteger('123456789012345678901234567890');
+const b = new BigInteger('987654321098765432109876543210');
+a.add(b);   // 大整数加法`,
+        mount(root) {
+          const { out } = skeleton(root,
+            '<div class="field"><label>大整数 a</label><input type="text" data-a value="123456789012345678901234567890" /></div>' +
+            '<div class="field"><label>大整数 b</label><input type="text" data-b value="987654321098765432109876543210" /></div>' +
+            '<div class="btn-row"><button class="btn" data-run>计算</button></div>', { single: true });
+          loadESM("jsbn", "https://esm.sh/jsbn@1.1.0").then((mod) => {
+            const BI = mod.BigInteger || mod;
+            function run() {
+              try {
+                const a = new BI(root.querySelector("[data-a]").value);
+                const b = new BI(root.querySelector("[data-b]").value);
+                out.innerHTML = '<span class="k">a + b = </span><span class="ok">' + a.add(b).toString() + '</span>\n' +
+                  '<span class="k">a − b = </span><span class="v">' + a.subtract(b).toString() + '</span>\n' +
+                  '<span class="k">a × b = </span><span class="v">' + a.multiply(b).toString().slice(0, 60) + '…</span>';
+              } catch (e) { out.innerHTML = '<span class="err">' + e.message + '</span>'; }
+            }
+            root.querySelector("[data-run]").onclick = run; run();
+          }).catch((e) => out.innerHTML = '<span class="err">加载失败：' + e.message + '</span>');
+        },
+      },
+      {
+        label: "模幂 (RSA 风格)",
+        code:
+`// 手写模幂：result = a^e mod n（平方-乘法）
+function modPow(a, e, n) {
+  let r = new BigInteger('1'), base = a;
+  while (e.compareTo(BigInteger.ZERO) > 0) {
+    if (e.isEven()) {} else r = r.multiply(base).mod(n);
+    base = base.multiply(base).mod(n);
+    e = e.shiftRight(1);
+  }
+  return r;
+}`,
+        mount(root) {
+          const { out } = skeleton(root,
+            '<div class="field"><label>底数 a</label><input type="text" data-a value="123456789" /></div>' +
+            '<div class="field"><label>指数 e</label><input type="text" data-e value="65537" /></div>' +
+            '<div class="field"><label>模 n</label><input type="text" data-n value="1000000007" /></div>' +
+            '<div class="btn-row"><button class="btn" data-run>模幂</button></div>', { single: true });
+          loadESM("jsbn", "https://esm.sh/jsbn@1.1.0").then((mod) => {
+            const BI = mod.BigInteger || mod;
+            function modPow(a, e, n) {
+              let r = new BI("1"), base = a;
+              while (e.compareTo(new BI("0")) > 0) {
+                if (e.testBit(0)) r = r.multiply(base).mod(n);
+                base = base.multiply(base).mod(n);
+                e = e.shiftRight(1);
+              }
+              return r;
+            }
+            function run() {
+              try {
+                const a = new BI(root.querySelector("[data-a]").value);
+                const e = new BI(root.querySelector("[data-e]").value);
+                const n = new BI(root.querySelector("[data-n]").value);
+                out.innerHTML = '<span class="k">a^e mod n = </span><span class="ok">' + modPow(a, e, n).toString() + '</span>\n' +
+                  '<span class="muted">平方-乘法把指数位运算化，将 O(e) 降到 O(log e)，是 RSA 加解密基础。</span>';
+              } catch (err) { out.innerHTML = '<span class="err">' + err.message + '</span>'; }
+            }
+            root.querySelector("[data-run]").onclick = run; run();
+          }).catch((e) => out.innerHTML = '<span class="err">加载失败：' + e.message + '</span>');
+        },
+      },
+    ],
+  };
+
+  /* ===================== 金融数学：financejs ===================== */
+  DEMOS.finance = {
+    tabs: [
+      {
+        label: "现值 / 终值",
+        code:
+`// financejs：常见金融公式
+const f = new Finance();
+f.PV(rate, nper, pmt, fv, type);   // 现值
+f.FV(rate, nper, pmt, fv, type);   // 终值`,
+        mount(root) {
+          const { out } = skeleton(root,
+            '<div class="range-row"><span>利率%</span><input type="number" data-r value="10" step="1" /></div>' +
+            '<div class="range-row"><span>期数n</span><input type="number" data-n value="10" step="1" /></div>' +
+            '<div class="range-row"><span>每期pmt</span><input type="number" data-p value="-1000" step="100" /></div>' +
+            '<div class="btn-row"><button class="btn" data-run>计算 PV / FV</button></div>', { single: true });
+          loadESM("Finance", "https://esm.sh/financejs@4.1.0").then((mod) => {
+            const F = new (mod.default || mod)();
+            function run() {
+              try {
+                const rate = +root.querySelector("[data-r]").value / 100;
+                const nper = +root.querySelector("[data-n]").value;
+                const pmt = +root.querySelector("[data-p]").value;
+                const pv = F.PV(rate, nper, pmt, 0, 0);
+                const fv = F.FV(rate, nper, pmt, 0, 0);
+                out.innerHTML = '<span class="k">PV(利率=' + (rate * 100) + '%, n=' + nper + ', pmt=' + pmt + ') = </span><span class="ok">' + fmt(pv, 2) + '</span>\n' +
+                  '<span class="k">FV(同参数) = </span><span class="v">' + fmt(fv, 2) + '</span>\n' +
+                  '<span class="muted">PV/FV 把一系列现金流折算到当前 / 未来价值。</span>';
+              } catch (e) { out.innerHTML = '<span class="err">' + e.message + '</span>'; }
+            }
+            root.querySelector("[data-run]").onclick = run; run();
+          }).catch((e) => out.innerHTML = '<span class="err">加载失败：' + e.message + '</span>');
+        },
+      },
+      {
+        label: "NPV / IRR / XIRR",
+        code:
+`// 注意：financejs 的 IRR / NPV 为可变参数（逐笔现金流）
+f.NPV(rate, cf1, cf2, ...);
+f.IRR(cf1, cf2, ...);          // 返回百分比
+f.XIRR(amounts, dates);        // 不等间隔 IRR`,
+        mount(root) {
+          const { out } = skeleton(root,
+            '<div class="field"><label>现金流（逗号分隔，首笔为负）</label><input type="text" data-cf value="-1000, 300, 400, 500, 600" /></div>' +
+            '<div class="range-row"><span>折现率%</span><input type="number" data-r value="10" step="1" /></div>' +
+            '<div class="btn-row"><button class="btn" data-run>计算</button></div>', { single: true });
+          loadESM("Finance", "https://esm.sh/financejs@4.1.0").then((mod) => {
+            const F = new (mod.default || mod)();
+            function run() {
+              try {
+                const cfs = root.querySelector("[data-cf]").value.split(",").map((s) => +s.trim());
+                const rate = +root.querySelector("[data-r]").value / 100;
+                const npv = F.NPV(rate, ...cfs);
+                const irr = F.IRR(...cfs);
+                const dts = cfs.map((_, i) => new Date(2020 + i, 0, 1));
+                const xirr = F.XIRR(cfs, dts);
+                out.innerHTML = '<span class="k">现金流 = </span><span class="v">[' + cfs.join(", ") + ']</span>\n' +
+                  '<span class="k">NPV(rate=' + (rate * 100) + '%) = </span><span class="ok">' + fmt(npv, 2) + '</span>\n' +
+                  '<span class="k">IRR = </span><span class="ok">' + fmt(irr / 100, 4) + ' (' + irr + '%)</span>\n' +
+                  '<span class="k">XIRR(按年) ≈ </span><span class="v">' + fmt(xirr / 100, 4) + ' (' + xirr + '%)</span>\n' +
+                  '<span class="muted">financejs 的 IRR/XIRR 返回百分比值。</span>';
+              } catch (e) { out.innerHTML = '<span class="err">' + e.message + '</span>'; }
+            }
+            root.querySelector("[data-run]").onclick = run; run();
+          }).catch((e) => out.innerHTML = '<span class="err">加载失败：' + e.message + '</span>');
+        },
+      },
+    ],
+  };
+
+  /* ===================== 内部收益率：自实现 IRR / XIRR ===================== */
+  DEMOS.irr = {
+    tabs: [
+      {
+        label: "IRR（内部收益率）",
+        code:
+`// 自实现 IRR：找使 NPV=0 的折现率（二分法）
+function npv(rate, cfs) {
+  let s = 0;
+  for (let t = 0; t < cfs.length; t++) s += cfs[t] / Math.pow(1 + rate, t);
+  return s;
+}
+// 在 [-0.9, 5] 上对 npv 二分求根`,
+        mount(root) {
+          const { out, viz } = skeleton(root,
+            '<div class="field"><label>现金流（逗号分隔，首笔为负）</label><input type="text" data-cf value="-1000, 300, 400, 500, 600" /></div>' +
+            '<div class="btn-row"><button class="btn" data-run>计算 IRR</button></div>',
+            { vizLabel: "NPV(r) 曲线与根" });
+          const { c, ctx, w, h } = mkCanvas(430, 260); viz.appendChild(c);
+          function npv(rate, cfs) { let s = 0; for (let t = 0; t < cfs.length; t++) s += cfs[t] / Math.pow(1 + rate, t); return s; }
+          function run() {
+            try {
+              const cfs = root.querySelector("[data-cf]").value.split(",").map((s) => +s.trim());
+              let lo = -0.9, hi = 5;
+              if (npv(lo, cfs) * npv(hi, cfs) > 0) throw new Error("NPV 在区间两端同号，无法二分（可改用牛顿法）");
+              for (let i = 0; i < 100; i++) { const mid = (lo + hi) / 2; if (npv(mid, cfs) * npv(lo, cfs) <= 0) hi = mid; else lo = mid; }
+              const r = (lo + hi) / 2;
+              const xs = [], ys = [];
+              for (let rr = -0.9; rr <= 1.0001; rr += 0.02) { xs.push(rr); ys.push(npv(rr, cfs)); }
+              const ymin = Math.min(...ys, 0), ymax = Math.max(...ys, 0); const pad = (ymax - ymin) * 0.1 || 1;
+              plot2D(ctx, w, h, { xmin: -0.9, xmax: 1, ymin: ymin - pad, ymax: ymax + pad },
+                (mx, my) => {
+                  line(ctx, xs.map((x, i) => [mx(x), my(ys[i])]), css("--accent"), 2.2);
+                  ctx.strokeStyle = css("--border"); ctx.beginPath(); ctx.moveTo(mx(-0.9), my(0)); ctx.lineTo(mx(1), my(0)); ctx.stroke();
+                  ctx.fillStyle = css("--accent-3"); ctx.beginPath(); ctx.arc(mx(r), my(0), 4.5, 0, 7); ctx.fill();
+                });
+              out.innerHTML = '<span class="k">现金流 = </span><span class="v">[' + cfs.join(", ") + ']</span>\n' +
+                '<span class="k">IRR = </span><span class="ok">' + fmt(r, 4) + ' (' + fmt(r * 100, 2) + '%)</span>\n' +
+                '<span class="muted">蓝点=NPV=0 的根，即内部收益率。</span>';
+            } catch (e) { out.innerHTML = '<span class="err">' + e.message + '</span>'; }
+          }
+          root.querySelector("[data-run]").onclick = run; run();
+        },
+      },
+      {
+        label: "XIRR（带日期）",
+        code:
+`// XIRR：现金流发生在不等间隔日期
+// f(r) = Σ cf_t / (1+r)^(days_t/365) = 0
+function xnpv(rate, cfs, days) {
+  let s = 0;
+  for (let i = 0; i < cfs.length; i++) s += cfs[i] / Math.pow(1 + rate, days[i] / 365);
+  return s;
+}`,
+        mount(root) {
+          const { out } = skeleton(root,
+            '<div class="field"><label>每行：金额,日期(YYYY-MM-DD)</label><textarea data-cf rows="4">-1000, 2020-01-01\n200, 2021-03-01\n1200, 2022-06-15</textarea></div>' +
+            '<div class="btn-row"><button class="btn" data-run>计算 XIRR</button></div>', { single: true });
+          function xnpv(rate, cfs, days) { let s = 0; for (let i = 0; i < cfs.length; i++) s += cfs[i] / Math.pow(1 + rate, days[i] / 365); return s; }
+          function run() {
+            try {
+              const rows = root.querySelector("[data-cf]").value.trim().split("\n").map((r) => r.split(","));
+              const cfs = rows.map((r) => +r[0].trim());
+              const d0 = new Date(rows[0][1].trim());
+              const days = rows.map((r) => (new Date(r[1].trim()) - d0) / (24 * 3600 * 1000));
+              let lo = -0.9, hi = 5;
+              if (xnpv(lo, cfs, days) * xnpv(hi, cfs, days) > 0) throw new Error("XNPV 区间同号，无法二分");
+              for (let i = 0; i < 100; i++) { const mid = (lo + hi) / 2; if (xnpv(mid, cfs, days) * xnpv(lo, cfs, days) <= 0) hi = mid; else lo = mid; }
+              const r = (lo + hi) / 2;
+              out.innerHTML = '<span class="k">现金流 = </span><span class="v">[' + cfs.join(", ") + ']</span>\n' +
+                '<span class="k">XIRR = </span><span class="ok">' + fmt(r, 4) + ' (' + fmt(r * 100, 2) + '%)</span>\n' +
+                '<span class="muted">按实际天数折算，解决不等间隔现金流的收益率。</span>';
+            } catch (e) { out.innerHTML = '<span class="err">' + e.message + '</span>'; }
+          }
+          root.querySelector("[data-run]").onclick = run; run();
+        },
+      },
+    ],
+  };
+
+  /* ===================== 时间序列分析：自实现 ===================== */
+  DEMOS.timeseries = {
+    tabs: [
+      {
+        label: "移动平均平滑",
+        code:
+`// 时间序列：用滑动窗口均值平滑噪声
+function movingAvg(arr, win) {
+  const out = [];
+  for (let i = 0; i < arr.length; i++) {
+    const s = Math.max(0, i - win + 1);
+    let sum = 0; for (let j = s; j <= i; j++) sum += arr[j];
+    out.push(sum / (i - s + 1));
+  }
+  return out;
+}`,
+        mount(root) {
+          const { out, viz } = skeleton(root,
+            '<div class="field"><label>窗口长度 win</label><input type="number" data-win value="5" step="1" min="2" max="20" /></div>' +
+            '<div class="btn-row"><button class="btn" data-run>生成并平滑</button></div>',
+            { vizLabel: "原始序列 vs 移动平均" });
+          const { c, ctx, w, h } = mkCanvas(430, 260); viz.appendChild(c);
+          function movingAvg(arr, win) { const out = []; for (let i = 0; i < arr.length; i++) { const s = Math.max(0, i - win + 1); let sum = 0; for (let j = s; j <= i; j++) sum += arr[j]; out.push(sum / (i - s + 1)); } return out; }
+          function run() {
+            try {
+              const win = +root.querySelector("[data-win]").value;
+              const n = 60, raw = [];
+              for (let i = 0; i < n; i++) raw.push(10 + 3 * Math.sin(i / 4) + (Math.random() * 2 - 1) * 2.5);
+              const ma = movingAvg(raw, win);
+              const xmin = 0, xmax = n - 1;
+              const all = raw.concat(ma); let ymin = Math.min(...all), ymax = Math.max(...all); const pad = (ymax - ymin) * 0.1 || 1;
+              plot2D(ctx, w, h, { xmin, xmax, ymin: ymin - pad, ymax: ymax + pad },
+                (mx, my) => {
+                  line(ctx, raw.map((v, i) => [mx(i), my(v)]), "rgba(255,107,107,0.7)", 1.4);
+                  line(ctx, ma.map((v, i) => [mx(i), my(v)]), css("--accent"), 2.4);
+                });
+              out.innerHTML = '<span class="k">窗口 win = </span><span class="v">' + win + '</span>\n' +
+                '<span class="muted">红=含噪原始序列，蓝=移动平均平滑后的趋势。</span>';
+            } catch (e) { out.innerHTML = '<span class="err">' + e.message + '</span>'; }
+          }
+          root.querySelector("[data-run]").onclick = run; run();
+        },
+      },
+      {
+        label: "自相关 (ACF)",
+        code:
+`// 自相关：衡量序列自身在不同时滞下的相似度
+function acf(arr, maxLag) {
+  const mean = arr.reduce((a,b)=>a+b,0)/arr.length;
+  const denom = arr.reduce((s,x)=>s+(x-mean)**2,0);
+  const out = [];
+  for (let lag = 0; lag <= maxLag; lag++) {
+    let num = 0;
+    for (let i = 0; i < arr.length - lag; i++) num += (arr[i]-mean)*(arr[i+lag]-mean);
+    out.push(num/denom);
+  }
+  return out;
+}`,
+        mount(root) {
+          const { out, viz } = skeleton(root,
+            '<div class="field"><label>最大时滞 maxLag</label><input type="number" data-lag value="12" step="1" min="2" max="30" /></div>' +
+            '<div class="btn-row"><button class="btn" data-run>计算 ACF</button></div>',
+            { vizLabel: "自相关系数" });
+          const { c, ctx, w, h } = mkCanvas(430, 260); viz.appendChild(c);
+          function acf(arr, maxLag) { const mean = arr.reduce((a, b) => a + b, 0) / arr.length; const denom = arr.reduce((s, x) => s + (x - mean) ** 2, 0); const out = []; for (let lag = 0; lag <= maxLag; lag++) { let num = 0; for (let i = 0; i < arr.length - lag; i++) num += (arr[i] - mean) * (arr[i + lag] - mean); out.push(num / denom); } return out; }
+          function run() {
+            try {
+              const maxLag = +root.querySelector("[data-lag]").value;
+              const n = 80, arr = [];
+              for (let i = 0; i < n; i++) arr.push(10 + 4 * Math.sin(i / 5) + (Math.random() * 2 - 1) * 1.5);
+              const a = acf(arr, maxLag);
+              bars(ctx, w, h, a.map((_, i) => i), a, { title: "ACF (lag→)", color: css("--accent-3") });
+              out.innerHTML = '<span class="k">最大时滞 = </span><span class="v">' + maxLag + '</span>\n' +
+                '<span class="k">lag=0 自相关 = </span><span class="ok">' + fmt(a[0], 3) + '</span>\n' +
+                '<span class="muted">周期性序列会在对应时滞处出现明显的自相关峰值。</span>';
+            } catch (e) { out.innerHTML = '<span class="err">' + e.message + '</span>'; }
+          }
+          root.querySelector("[data-run]").onclick = run; run();
+        },
+      },
+    ],
+  };
+
+  /* ===================== 布尔代数：boolean ===================== */
+  DEMOS.booleanjs = {
+    tabs: [
+      {
+        label: "解析与求值",
+        code:
+`// boolean：布尔表达式解析库（把变量替换为 true/false 后求值）
+const expr = 'A and (B or not C)';
+boolean(expr).toString();   // 未赋值变量默认视为 false`,
+        mount(root) {
+          const { out } = skeleton(root,
+            '<div class="field"><label>布尔表达式</label><input type="text" data-expr value="A and (B or not C)" /></div>' +
+            '<div class="range-row"><span>A</span><select data-a><option value="1">true</option><option value="0">false</option></select>' +
+            '<span>B</span><select data-b><option value="1">true</option><option value="0">false</option></select>' +
+            '<span>C</span><select data-c><option value="1">true</option><option value="0">false</option></select></div>' +
+            '<div class="btn-row"><button class="btn" data-run>求值</button></div>', { single: true });
+          loadESM("booleanjs", "https://esm.sh/boolean@3.2.0").then((mod) => {
+            const make = mod.boolean || mod;
+            function run() {
+              try {
+                const expr = root.querySelector("[data-expr]").value;
+                const map = { A: root.querySelector("[data-a]").value === "1", B: root.querySelector("[data-b]").value === "1", C: root.querySelector("[data-c]").value === "1" };
+                const vars = [...new Set((expr.match(/[A-Za-z_]\w*/g) || []))].filter((v) => !["and", "or", "not", "true", "false", "xor", "nand", "nor", "xnor", "implies"].includes(v));
+                let sub = expr;
+                vars.forEach((v) => { sub = sub.replace(new RegExp(v, "g"), map[v] ? "true" : "false"); });
+                const res = make(sub).toString();
+                out.innerHTML = '<span class="k">表达式 = </span><span class="v">' + expr + '</span>\n' +
+                  '<span class="k">代入 = </span><span class="v">A=' + map.A + ', B=' + map.B + ', C=' + map.C + '</span>\n' +
+                  '<span class="k">结果 = </span><span class="ok">' + res + '</span>\n' +
+                  '<span class="muted">变量替换为 true/false 后由 boolean 解析求值。</span>';
+              } catch (e) { out.innerHTML = '<span class="err">' + e.message + '</span>'; }
+            }
+            root.querySelector("[data-run]").onclick = run; run();
+          }).catch((e) => out.innerHTML = '<span class="err">加载失败：' + e.message + '</span>');
+        },
+      },
+      {
+        label: "真值表",
+        code:
+`// 枚举所有变量组合，代入后由 boolean 求值，生成真值表
+const vars = ['A','B','C'];
+vars.forEach(combo => {
+  const sub = expr.replace(/A/g, combo.A? 'true':'false')...;
+  table.push(boolean(sub).toString());
+});`,
+        mount(root) {
+          const { out } = skeleton(root,
+            '<div class="field"><label>布尔表达式（变量用大写字母）</label><input type="text" data-expr value="A and (B or not C)" /></div>' +
+            '<div class="btn-row"><button class="btn" data-run>生成真值表</button></div>', { single: true });
+          loadESM("booleanjs", "https://esm.sh/boolean@3.2.0").then((mod) => {
+            const make = mod.boolean || mod;
+            function run() {
+              try {
+                const expr = root.querySelector("[data-expr]").value;
+                const vars = [...new Set((expr.match(/[A-Za-z_]\w*/g) || []))].filter((v) => !["and", "or", "not", "true", "false", "xor", "nand", "nor", "xnor", "implies"].includes(v));
+                if (vars.length > 5) throw new Error("变量过多（最多 5 个，2^" + vars.length + " 行）");
+                let html = '<table style="border-collapse:collapse;font:11px monospace"><tr>' + vars.map((v) => '<th style="padding:2px 6px;border:1px solid ' + css("--border") + '">' + v + '</th>').join("") + '<th style="padding:2px 6px;border:1px solid ' + css("--border") + '">结果</th></tr>';
+                for (let mask = 0; mask < (1 << vars.length); mask++) {
+                  const map = {}; vars.forEach((v, i) => { map[v] = !!(mask & (1 << (vars.length - 1 - i))); });
+                  let sub = expr; vars.forEach((v) => { sub = sub.replace(new RegExp(v, "g"), map[v] ? "true" : "false"); });
+                  const res = make(sub).toString();
+                  html += '<tr>' + vars.map((v) => '<td style="padding:2px 6px;border:1px solid ' + css("--border") + '">' + (map[v] ? 1 : 0) + '</td>').join("") + '<td style="padding:2px 6px;border:1px solid ' + css("--border") + ';color:' + css("--accent") + '">' + res + '</td></tr>';
+                }
+                html += '</table>';
+                out.innerHTML = '<span class="k">变量：</span><span class="v">' + vars.join(", ") + '</span>（' + (1 << vars.length) + ' 行）\n' + html;
+              } catch (e) { out.innerHTML = '<span class="err">' + e.message + '</span>'; }
+            }
+            root.querySelector("[data-run]").onclick = run; run();
+          }).catch((e) => out.innerHTML = '<span class="err">加载失败：' + e.message + '</span>');
         },
       },
     ],
