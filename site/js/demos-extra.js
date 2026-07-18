@@ -6,7 +6,7 @@
 (function () {
   "use strict";
   const D = window.__demo || {};
-  const { css, mkCanvas, fmt, fmtArr, plot2D, line, arrow, heat, bars, skeleton, has, onCleanup } = D;
+  const { css, mkCanvas, plot2D, line, bars, skeleton, has } = D;
 
   // esm.sh 懒加载助手（带缓存）
   const _esm = {};
@@ -444,10 +444,9 @@ const p1 = new flatten.Polygon([new flatten.Point(0,0), new flatten.Point(10,0),
 const p2 = new flatten.Polygon([new flatten.Point(5,5), ... ]);
 p1.intersect(p2);   // 返回交集多边形（数组）`,
         mount(root) {
-          const { out } = skeleton(root,
+          const { out, viz } = skeleton(root,
             '<div class="btn-row"><button class="btn" data-run>计算交集（两个正方形）</button></div>', { vizLabel: "交集多边形" });
-          const { c, ctx, w, h } = mkCanvas(440, 300); root.querySelector("[data-viz]").appendChild(c); out.parentNode; // noop
-          const viz = root.parentElement.querySelector("[data-viz]") || out;
+          const { c, ctx, w, h } = mkCanvas(440, 300); viz.appendChild(c);
           function draw(poly, color) {
             const pts = (poly.vertices && poly.vertices.length ? poly.vertices : []).map((v) => [v.x, v.y]);
             if (!pts.length) return;
@@ -458,7 +457,6 @@ p1.intersect(p2);   // 返回交集多边形（数组）`,
           out.innerHTML = '<span class="muted">加载 flatten-js…</span>';
           loadESM("flatten", "https://esm.sh/flatten-js@0.6.9").then((f) => {
             const F = def(f);
-            const vizBox = document.createElement("div"); vizBox.className = "viz"; out.parentElement.appendChild(vizBox); root.querySelector("[data-viz]").appendChild(c);
             function run() {
               const p1 = new F.Polygon([new F.Point(0, 0), new F.Point(10, 0), new F.Point(10, 10), new F.Point(0, 10)]);
               const p2 = new F.Polygon([new F.Point(5, 5), new F.Point(15, 5), new F.Point(15, 15), new F.Point(5, 15)]);
@@ -547,9 +545,7 @@ const tris = earcut(coords, [holeStart], 2);  // 返回顶点索引数组`,
         mount(root) {
           const { out } = skeleton(root,
             '<div class="btn-row"><button class="btn" data-run>三角化（带洞正方形）</button></div>', { vizLabel: "三角网格" });
-          const { c, ctx, w, h } = mkCanvas(440, 300); root.querySelector("[data-viz]").appendChild(c);
-          /* removed: viz box now provided by skeleton [data-viz] */ viz.appendChild(c);
-          // 外环 0..7 (方形 0..12)，洞 8..11 (方形 4..8)
+          const { c, ctx, w, h } = mkCanvas(440, 300); root.querySelector("[data-viz]").appendChild(c);          // 外环 0..7 (方形 0..12)，洞 8..11 (方形 4..8)
           const ring = [[0, 0], [12, 0], [12, 12], [0, 12], [4, 4], [8, 4], [8, 8], [4, 8]];
           const flat = []; ring.forEach((p) => flat.push(p[0], p[1]));
           const holes = [8]; // 洞从第 4 个点开始
@@ -590,9 +586,7 @@ const tris = ctx.getTriangles();`,
         mount(root) {
           const { out } = skeleton(root,
             '<div class="btn-row"><button class="btn" data-run>三角化</button></div>', { vizLabel: "Delaunay 网格" });
-          const { c, ctx, w, h } = mkCanvas(440, 300); root.querySelector("[data-viz]").appendChild(c);
-          /* removed: viz box now provided by skeleton [data-viz] */ viz.appendChild(c);
-          function run() {
+          const { c, ctx, w, h } = mkCanvas(440, 300); root.querySelector("[data-viz]").appendChild(c);          function run() {
             out.innerHTML = '<span class="muted">加载 poly2tri…</span>';
             loadESM("poly2tri", "https://esm.sh/poly2tri@1.5.0").then((p) => {
               const P = def(p);
@@ -659,7 +653,7 @@ a.add(b); a.dot(b); a.cross(b); a.magnitude(); a.normalize();`,
       {
         label: "训练 XOR",
         code:
-`import brain from 'brain';
+`import brain from 'brain.js';
 const net = new brain.NeuralNetwork({ hiddenLayers: [3] });
 await net.trainAsync([
   { input: [0,0], output: [0] },
@@ -672,7 +666,7 @@ net.run([1, 0]);   // ≈ [1]`,
           const { out } = skeleton(root,
             '<div class="btn-row"><button class="btn" data-run>训练 XOR 网络</button></div>', { single: true });
           out.innerHTML = '<span class="muted">加载 Brain.js…</span>';
-          loadESM("brain", "https://esm.sh/brain@1.0.0").then((b) => {
+          loadESM("brain", "https://esm.sh/brain.js@1.6.1").then((b) => {
             const brain = def(b);
             function run() {
               const net = new brain.NeuralNetwork({ hiddenLayers: [4] });
@@ -713,9 +707,7 @@ f.completeSpectrum(out);              // 幅值 = hypot(out[2k], out[2k+1])`,
             '<div class="field"><label>信号长度 N（2 的幂）</label><input type="number" data-n value="64" /></div>' +
             '<div class="field"><label>频率 f1, f2（逗号）</label><input type="text" data-f value="4, 10" /></div>' +
             '<div class="btn-row"><button class="btn" data-run>计算 FFT</button></div>', { vizLabel: "幅值频谱" });
-          const { c, ctx, w, h } = mkCanvas(460, 260);
-          /* removed: viz box now provided by skeleton [data-viz] */ viz.appendChild(c);
-          out.innerHTML = '<span class="muted">加载 fft.js…</span>';
+          const { c, ctx, w, h } = mkCanvas(460, 260);          out.innerHTML = '<span class="muted">加载 fft.js…</span>';
           loadESM("fft", "https://esm.sh/fft.js@4.0.4").then((F) => {
             const FFT = def(F);
             function run() {
@@ -753,9 +745,7 @@ fft.spectrum;             // Float64Array 幅值谱`,
             '<div class="field"><label>采样数（2 的幂）</label><input type="number" data-n value="1024" /></div>' +
             '<div class="field"><label>频率 Hz</label><input type="number" data-f value="440" /></div>' +
             '<div class="btn-row"><button class="btn" data-run>计算频谱</button></div>', { vizLabel: "幅值频谱" });
-          const { c, ctx, w, h } = mkCanvas(460, 260);
-          /* removed: viz box now provided by skeleton [data-viz] */ viz.appendChild(c);
-          out.innerHTML = '<span class="muted">加载 dsp.js…</span>';
+          const { c, ctx, w, h } = mkCanvas(460, 260);          out.innerHTML = '<span class="muted">加载 dsp.js…</span>';
           loadESM("DSP", "https://esm.sh/dsp.js@1.0.1").then((d) => {
             const DSP = def(d);
             function run() {
@@ -827,9 +817,7 @@ fitted.parameterValues;   // [a,b,c]`,
         mount(root) {
           const { out } = skeleton(root,
             '<div class="btn-row"><button class="btn" data-run>拟合 a·e^(−b·t)+c</button></div>', { vizLabel: "拟合曲线 vs 数据" });
-          const { c, ctx, w, h } = mkCanvas(460, 260);
-          /* removed: viz box now provided by skeleton [data-viz] */ viz.appendChild(c);
-          out.innerHTML = '<span class="muted">加载 ml-levenberg-marquardt…</span>';
+          const { c, ctx, w, h } = mkCanvas(460, 260);          out.innerHTML = '<span class="muted">加载 ml-levenberg-marquardt…</span>';
           loadESM("MLLevenbergMarquardt", "https://esm.sh/ml-levenberg-marquardt@5.0.1").then((m) => {
             const LM = m.levenbergMarquardt || def(m);
             function run() {
@@ -1060,10 +1048,8 @@ const cy = cytoscape({ container, elements, layout:{name:'cose'} });
 const dijk = cy.elements().dijkstra({ root: '#A' });
 dijk.distanceTo(cy.$('#C'));   // 最短距离`,
         mount(root) {
-          const { out } = skeleton(root,
+          const { out, viz } = skeleton(root,
             '<div class="btn-row"><button class="btn" data-run>渲染网络图</button></div>', { vizLabel: "图可视化" });
-          const { c, ctx, w, h } = mkCanvas(440, 320);
-          /* removed: viz box now provided by skeleton [data-viz] */
           const box = document.createElement("div"); box.style.cssText = "width:100%;height:320px;"; viz.appendChild(box);
           function run() {
             try {
@@ -1434,9 +1420,7 @@ cephes.lgam(10);    // ln Γ(10)`,
           const { out } = skeleton(root,
             '<div class="field"><label>x</label><input type="number" data-x value="1" step="0.1" /></div>' +
             '<div class="btn-row"><button class="btn" data-run>计算</button></div>', { vizLabel: "Γ(x) 曲线" });
-          const { c, ctx, w, h } = mkCanvas(440, 240);
-          /* removed: viz box now provided by skeleton [data-viz] */ viz.appendChild(c);
-          out.innerHTML = '<span class="muted">加载 cephes…</span>';
+          const { c, ctx, w, h } = mkCanvas(440, 240);          out.innerHTML = '<span class="muted">加载 cephes…</span>';
           loadESM("cephes", "https://esm.sh/cephes@3.3.3").then((C) => {
             const cephes = def(C);
             function run() {

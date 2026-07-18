@@ -316,6 +316,19 @@ a:hover { text-decoration: underline; }
 }
 .viz canvas { max-width: 100%; border-radius: 6px; }
 
+/* MathJax 公式渲染容器（DEMOS.mathjax） */
+.mj-box {
+  width: 100%; min-height: 60px; margin-top: 10px;
+  background: var(--bg); border: 1px solid var(--border-soft);
+  border-radius: 8px; padding: 14px 16px; overflow-x: auto;
+}
+
+/* 分步化简步骤（DEMOS.mathsteps） */
+.step { display: flex; gap: 10px; align-items: baseline; padding: 6px 0; border-bottom: 1px dashed var(--border-soft); }
+.step-n { flex: 0 0 22px; height: 22px; line-height: 22px; text-align: center; border-radius: 50%; background: var(--accent); color: #fff; font-size: 12px; font-weight: 700; }
+.step-ct { flex: 0 0 130px; color: var(--accent-3); font-family: var(--mono); font-size: 12px; }
+.step-after { font-family: var(--mono); color: var(--text); font-size: 13px; }
+
 .result-label { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-faint); margin: 0 0 6px; font-weight: 700; }
 
 .code-inline {

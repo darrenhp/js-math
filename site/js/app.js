@@ -46,7 +46,7 @@
     contentInner.innerHTML =
       `<div class="welcome">
         <h2>JavaScript 数学库能力演示</h2>
-        <p class="lead">一站式浏览 20+ 个前端数学库：涵盖通用计算、线性代数、统计、几何、随机数、符号计算、机器学习。每个库都配有<strong>可实时运行、可交互调参</strong>的 Demo 与可视化。点击左侧任意库开始探索。</p>
+        <p class="lead">一站式浏览 57 个前端数学库：涵盖通用计算、线性代数、统计、几何、随机数、符号计算、机器学习、信号处理、图论、单位换算、数论与组合、特殊函数等。每个库都配有<strong>可实时运行、可交互调参</strong>的 Demo 与可视化。点击左侧任意库开始探索。</p>
         <div class="stat-row">
           <div class="stat"><div class="num">${LIBS.length}</div><div class="lab">收录库</div></div>
           <div class="stat"><div class="num">${CATS.length}</div><div class="lab">分类</div></div>

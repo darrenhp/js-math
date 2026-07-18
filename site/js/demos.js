@@ -153,6 +153,20 @@
   }
   window.__renderDemo = tabDemo;
 
+  // esm.sh 懒加载（供无 UMD 全局、只能 ESM 引入的库，如 numjs）
+  const _esm = {};
+  function loadESM(name, url) {
+    if (window[name]) return Promise.resolve(window[name]);
+    if (_esm[url]) return _esm[url];
+    const p = import(/* @vite-ignore */ url).then((mod) => {
+      const exp = (mod && mod.array) ? mod : (mod.default || mod);
+      window[name] = exp;
+      return exp;
+    });
+    _esm[url] = p;
+    return p;
+  }
+
   /* ============================================================
    * DEMOS 集合
    * ========================================================== */
@@ -960,23 +974,25 @@ a.sum(); a.mean(); a.max();`,
             '<div class="field"><label>一维数据（逗号分隔）</label><input type="text" data-arr value="1,2,3,4,5,6,7,8,9,10,11,12" /></div>' +
             '<div class="field"><label>reshape 行 × 列</label><div style="display:flex;gap:8px"><input type="number" data-r value="3" style="flex:1" /><input type="number" data-c value="4" style="flex:1" /></div></div>' +
             '<div class="btn-row"><button class="btn" data-run>运行 NumPy 风格运算</button></div>', { single: true });
-          function run() {
-            try {
-              if (!window.nj) throw new Error("numjs 未加载");
-              const arr = root.querySelector("[data-arr]").value.split(",").map(Number);
-              const r = +root.querySelector("[data-r]").value, cc = +root.querySelector("[data-c]").value;
-              const a = window.nj.array(arr).reshape(r, cc);
-              const t = a.T;
-              out.innerHTML =
-                '<span class="k">ndarray (' + r + '×' + cc + ') =</span>\n' + a.toString() + '\n\n' +
-                '<span class="k">转置 aᵀ =</span>\n' + t.toString() + '\n\n' +
-                '<span class="k">a + 100 =</span>\n' + a.add(100).toString() + '\n\n' +
-                '<span class="k">sum=</span><span class="v">' + a.sum() + '</span>  ' +
-                '<span class="k">mean=</span><span class="v">' + fmt(a.mean(), 3) + '</span>  ' +
-                '<span class="k">max=</span><span class="v">' + a.max() + '</span>';
-            } catch (e) { out.innerHTML = '<span class="err">' + e.message + '</span>'; }
-          }
-          root.querySelector("[data-run]").onclick = run; run();
+          out.innerHTML = '<span class="muted">加载 numjs…</span>';
+          loadESM("nj", "https://esm.sh/numjs@0.16.1").then((nj) => {
+            function run() {
+              try {
+                const arr = root.querySelector("[data-arr]").value.split(",").map(Number);
+                const r = +root.querySelector("[data-r]").value, cc = +root.querySelector("[data-c]").value;
+                const a = nj.array(arr).reshape(r, cc);
+                const t = a.T;
+                out.innerHTML =
+                  '<span class="k">ndarray (' + r + '×' + cc + ') =</span>\n' + a.toString() + '\n\n' +
+                  '<span class="k">转置 aᵀ =</span>\n' + t.toString() + '\n\n' +
+                  '<span class="k">a + 100 =</span>\n' + a.add(100).toString() + '\n\n' +
+                  '<span class="k">sum=</span><span class="v">' + a.sum() + '</span>  ' +
+                  '<span class="k">mean=</span><span class="v">' + fmt(a.mean(), 3) + '</span>  ' +
+                  '<span class="k">max=</span><span class="v">' + a.max() + '</span>';
+              } catch (e) { out.innerHTML = '<span class="err">' + e.message + '</span>'; }
+            }
+            root.querySelector("[data-run]").onclick = run; run();
+          }).catch((e) => out.innerHTML = '<span class="err">加载失败：' + e.message + '</span>');
         },
       },
       {
@@ -991,21 +1007,23 @@ const sub = a.slice({ rows: [0,2], columns: [1,3] });  // 切片`,
           const { out } = skeleton(root,
             '<div class="field"><label>矩阵数据（每行一组，逗号分隔）</label><textarea data-A rows="3">1, 5, 3\n4, 2, 8\n6, 0, 7</textarea></div>' +
             '<div class="btn-row"><button class="btn" data-run>按轴统计 + 切片</button></div>', { single: true });
-          function run() {
-            try {
-              if (!window.nj) throw new Error("numjs 未加载");
-              const data = root.querySelector("[data-A]").value.trim().split("\n").map((r) => r.split(",").map(Number));
-              const a = window.nj.array(data);
-              const slice = a.slice({ rows: [0, 2], columns: [1, 3] });
-              out.innerHTML =
-                '<span class="k">a =</span>\n' + a.toString() + '\n' +
-                '<span class="k">按列均值 mean(0) = </span><span class="v">' + fmtArr(a.mean(0).tolist(), 3) + '</span>\n' +
-                '<span class="k">按行求和 sum(1) = </span><span class="v">' + fmtArr(a.sum(1).tolist(), 2) + '</span>\n' +
-                '<span class="k">标准差 std = </span><span class="v">' + fmt(a.std(), 4) + '</span>\n' +
-                '<span class="k">切片 rows[0,2) cols[1,3) =</span>\n' + slice.toString();
-            } catch (e) { out.innerHTML = '<span class="err">' + e.message + '</span>'; }
-          }
-          root.querySelector("[data-run]").onclick = run; run();
+          out.innerHTML = '<span class="muted">加载 numjs…</span>';
+          loadESM("nj", "https://esm.sh/numjs@0.16.1").then((nj) => {
+            function run() {
+              try {
+                const data = root.querySelector("[data-A]").value.trim().split("\n").map((r) => r.split(",").map(Number));
+                const a = nj.array(data);
+                const slice = a.slice({ rows: [0, 2], columns: [1, 3] });
+                out.innerHTML =
+                  '<span class="k">a =</span>\n' + a.toString() + '\n' +
+                  '<span class="k">按列均值 mean(0) = </span><span class="v">' + fmtArr(a.mean(0).tolist(), 3) + '</span>\n' +
+                  '<span class="k">按行求和 sum(1) = </span><span class="v">' + fmtArr(a.sum(1).tolist(), 2) + '</span>\n' +
+                  '<span class="k">标准差 std = </span><span class="v">' + fmt(a.std(), 4) + '</span>\n' +
+                  '<span class="k">切片 rows[0,2) cols[1,3) =</span>\n' + slice.toString();
+              } catch (e) { out.innerHTML = '<span class="err">' + e.message + '</span>'; }
+            }
+            root.querySelector("[data-run]").onclick = run; run();
+          }).catch((e) => out.innerHTML = '<span class="err">加载失败：' + e.message + '</span>');
         },
       },
       {
@@ -1022,19 +1040,21 @@ nj.exp(x);                   // e^x 逐元素`,
             '<div class="field"><label>向量 x（逗号分隔）</label><input type="text" data-x value="1, 2, 3" /></div>' +
             '<div class="field"><label>向量 y（逗号分隔）</label><input type="text" data-y value="4, 5, 6" /></div>' +
             '<div class="btn-row"><button class="btn" data-run>向量运算</button></div>', { single: true });
-          function run() {
-            try {
-              if (!window.nj) throw new Error("numjs 未加载");
-              const x = window.nj.array(root.querySelector("[data-x]").value.split(",").map(Number));
-              const y = window.nj.array(root.querySelector("[data-y]").value.split(",").map(Number));
-              out.innerHTML =
-                '<span class="k">点积 x·y     = </span><span class="ok">' + x.dot(y) + '</span>\n' +
-                '<span class="k">x + y        = </span><span class="ok">' + fmtArr(x.add(y).tolist(), 2) + '</span>\n' +
-                '<span class="k">x * y(逐元素)= </span><span class="ok">' + fmtArr(x.multiply(y).tolist(), 2) + '</span>\n' +
-                '<span class="k">e^x         = </span><span class="ok">' + fmtArr(window.nj.exp(x).tolist(), 3) + '</span>';
-            } catch (e) { out.innerHTML = '<span class="err">' + e.message + '</span>'; }
-          }
-          root.querySelector("[data-run]").onclick = run; run();
+          out.innerHTML = '<span class="muted">加载 numjs…</span>';
+          loadESM("nj", "https://esm.sh/numjs@0.16.1").then((nj) => {
+            function run() {
+              try {
+                const x = nj.array(root.querySelector("[data-x]").value.split(",").map(Number));
+                const y = nj.array(root.querySelector("[data-y]").value.split(",").map(Number));
+                out.innerHTML =
+                  '<span class="k">点积 x·y     = </span><span class="ok">' + x.dot(y) + '</span>\n' +
+                  '<span class="k">x + y        = </span><span class="ok">' + fmtArr(x.add(y).tolist(), 2) + '</span>\n' +
+                  '<span class="k">x * y(逐元素)= </span><span class="ok">' + fmtArr(x.multiply(y).tolist(), 2) + '</span>\n' +
+                  '<span class="k">e^x         = </span><span class="ok">' + fmtArr(nj.exp(x).tolist(), 3) + '</span>';
+              } catch (e) { out.innerHTML = '<span class="err">' + e.message + '</span>'; }
+            }
+            root.querySelector("[data-run]").onclick = run; run();
+          }).catch((e) => out.innerHTML = '<span class="err">加载失败：' + e.message + '</span>');
         },
       },
     ],
