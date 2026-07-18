@@ -3000,4 +3000,6 @@ const start = n * (n + 1) / 2;              // 第 n 行起点
   })();
 
   window.DEMOS = DEMOS;
+  // 暴露通用助手，供 demos-extra.js 复用
+  window.__demo = { css, mkCanvas, fmt, fmtArr, plot2D, line, arrow, heat, bars, skeleton, has, onCleanup };
 })();
