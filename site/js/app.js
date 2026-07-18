@@ -8,30 +8,70 @@
   const nav = $("#nav"), contentInner = $("#contentInner");
   const libByCat = (cid) => LIBS.filter((l) => l.cat === cid);
   const catById = (id) => CATS.find((c) => c.id === id);
+  let activeCat = CATS[0] && CATS[0].id;
 
-  /* ---------- 构建侧边栏 ---------- */
+  /* ---------- 构建侧边栏（仅当前分类；搜索时为全局） ---------- */
+  function navItem(lib) {
+    const item = document.createElement("div");
+    item.className = "nav-item"; item.dataset.id = lib.id;
+    const loaded = window.__libHas(lib.global);
+    item.innerHTML = `<span class="ni-name">${lib.name}</span>
+      <span class="ni-badge" style="${loaded ? "" : "opacity:.5"}">${loaded ? "●" : "○"}</span>`;
+    item.onclick = () => { location.hash = "#/" + lib.id; };
+    return item;
+  }
+  function navGroup(cat, libs) {
+    const group = document.createElement("div"); group.className = "nav-group";
+    group.innerHTML = `<div class="nav-group-title"><span class="dot" style="background:${cat.color}"></span>${cat.name}</div>`;
+    libs.forEach((l) => group.appendChild(navItem(l)));
+    return group;
+  }
   function buildNav(filter) {
     nav.innerHTML = "";
     const f = (filter || "").trim().toLowerCase();
-    CATS.forEach((cat) => {
-      let libs = libByCat(cat.id);
-      if (f) libs = libs.filter((l) =>
-        (l.name + l.tagline + l.useCases.join("") + l.positioning).toLowerCase().includes(f));
-      if (!libs.length) return;
-      const group = document.createElement("div"); group.className = "nav-group";
-      group.innerHTML = `<div class="nav-group-title"><span class="dot" style="background:${cat.color}"></span>${cat.name}</div>`;
-      libs.forEach((lib) => {
-        const item = document.createElement("div");
-        item.className = "nav-item"; item.dataset.id = lib.id;
-        const loaded = window.__libHas(lib.global);
-        item.innerHTML = `<span class="ni-name">${lib.name}</span>
-          <span class="ni-badge" style="${loaded ? "" : "opacity:.5"}">${loaded ? "●" : "○"}</span>`;
-        item.onclick = () => { location.hash = "#/" + lib.id; };
-        group.appendChild(item);
+    if (f) {
+      CATS.forEach((cat) => {
+        const libs = libByCat(cat.id).filter((l) =>
+          (l.name + l.tagline + l.useCases.join("") + l.positioning).toLowerCase().includes(f));
+        if (libs.length) nav.appendChild(navGroup(cat, libs));
       });
-      nav.appendChild(group);
+    } else if (activeCat) {
+      const cat = catById(activeCat);
+      if (cat) nav.appendChild(navGroup(cat, libByCat(cat.id)));
+    }
+    const matchN = nav.querySelectorAll(".nav-item").length;
+    $("#libCount").textContent = f ? `${matchN} 个匹配 · ${CATS.length} 类` : `${LIBS.length} 个库 · ${CATS.length} 类`;
+    // 重新应用当前路由高亮（buildNav 会重建 DOM，需恢复 active）
+    const cur = location.hash.replace(/^#\/?/, "");
+    setActive(LIBS.some((l) => l.id === cur) ? cur : null);
+  }
+
+  /* ---------- 分类 banner ---------- */
+  function buildBanner() {
+    const inner = $("#bannerInner"); if (!inner) return;
+    inner.innerHTML = "";
+    CATS.forEach((cat) => {
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "cat-chip"; chip.dataset.cat = cat.id;
+      chip.innerHTML = `<span class="dot" style="background:${cat.color}"></span>${cat.name}`;
+      chip.onclick = () => selectCategory(cat.id);
+      inner.appendChild(chip);
     });
-    $("#libCount").textContent = `${LIBS.length} 个库 · ${CATS.length} 类`;
+  }
+  function updateBanner() {
+    const inner = $("#bannerInner"); if (!inner) return;
+    inner.querySelectorAll(".cat-chip").forEach((c) =>
+      c.classList.toggle("active", c.dataset.cat === activeCat));
+  }
+  function selectCategory(catId) {
+    if (!catById(catId)) return;
+    activeCat = catId;
+    $("#searchInput").value = "";   // 退出搜索态，回到该分类列表
+    updateBanner();
+    buildNav("");
+    const first = libByCat(catId)[0];
+    if (first) location.hash = "#/" + first.id;
   }
 
   window.__libHas = function (name) {
@@ -41,7 +81,10 @@
 
   /* ---------- 首页 ---------- */
   function renderWelcome() {
+    activeCat = activeCat || (CATS[0] && CATS[0].id);
     setActive(null);
+    updateBanner();
+    buildNav("");
     let loadedN = LIBS.filter((l) => window.__libHas(l.global)).length;
     contentInner.innerHTML =
       `<div class="welcome">
@@ -139,7 +182,14 @@
     const h = location.hash.replace(/^#\/?/, "");
     if (!h) { renderWelcome(); return; }
     const lib = LIBS.find((l) => l.id === h);
-    if (lib) renderLib(lib); else renderWelcome();
+    if (lib) {
+      activeCat = lib.cat;
+      updateBanner();
+      buildNav($("#searchInput").value);
+      renderLib(lib);
+    } else {
+      renderWelcome();
+    }
     closeSidebar();
   }
 
@@ -227,6 +277,8 @@
 
   /* ---------- 启动 ---------- */
   function boot() {
+    buildBanner();
+    updateBanner();
     buildNav();
     window.addEventListener("hashchange", route);
     route();
