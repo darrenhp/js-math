@@ -5,19 +5,17 @@ window.CATEGORIES = [
   { id: "general",  name: "通用数学计算",     color: "#7c8cff" },
   { id: "symbolic", name: "符号计算 / 逻辑代数", color: "#b18cff" },
   { id: "linalg",   name: "线性代数 / 矩阵 / 稀疏", color: "#4dd6c1" },
-  { id: "stats",    name: "统计学",           color: "#ffc234" },
-  { id: "random",   name: "随机数 / 概率",    color: "#6be585" },
+  { id: "stats",    name: "统计 / 概率",      color: "#ffc234" },
   { id: "geometry", name: "几何 / 空间计算",  color: "#ff7ac6" },
   { id: "ml",       name: "机器学习 / 张量",  color: "#ff9f6b" },
   { id: "signal",   name: "信号处理 / 时间序列", color: "#ff6b6b" },
-  { id: "calculus", name: "微积分 / 数值求解", color: "#ff6b9d" },
+  { id: "calculus", name: "数值分析 / 插值拟合", color: "#ff6b9d" },
   { id: "graph",    name: "图论",             color: "#5ec8ff" },
   { id: "units",    name: "单位换算 / 物理",  color: "#9b8cff" },
   { id: "numtheory",name: "数论 / 特殊数制",  color: "#8cffb0" },
   { id: "stdlib",   name: "数学函数 / 特殊函数", color: "#c0d860" },
   { id: "crypto",   name: "密码学数学",       color: "#ffcf5e" },
   { id: "finance",  name: "金融数学",         color: "#5effa8" },
-  { id: "interp",   name: "插值 / 拟合 / 样条", color: "#4dd0ff" },
   { id: "misc",     name: "可视化 / 分形",    color: "#ffd166" },
   { id: "gpu",      name: "GPU 加速数学",     color: "#6b8cff" },
 ];
@@ -275,7 +273,7 @@ window.LIBS = [
 
   /* ---------- 随机数 / 概率 ---------- */
   {
-    id: "seedrandom", cat: "random", name: "seedrandom", global: "Math.seedrandom|seedrandom",
+    id: "seedrandom", cat: "stats", name: "seedrandom", global: "Math.seedrandom|seedrandom",
     npm: "https://www.npmjs.com/package/seedrandom", site: "https://github.com/davidbau/seedrandom",
     tagline: "可播种的伪随机数生成器，相同种子必得相同随机序列。",
     positioning: "需要“可复现随机”的场景首选，测试、游戏关卡、程序化生成都靠它保证一致性。",
@@ -286,7 +284,7 @@ window.LIBS = [
     demo: "seedrandom",
   },
   {
-    id: "random-js", cat: "random", name: "random-js", global: "Random",
+    id: "random-js", cat: "stats", name: "random-js", global: "Random",
     npm: "https://www.npmjs.com/package/random-js", site: "https://github.com/ckknight/random-js",
     tagline: "专业级随机数库，将“随机引擎”与“分布”分离，输出无偏结果。",
     positioning: "追求随机质量与无偏分布时的严肃选择，基于 Mersenne Twister，接口现代（TS 友好）。",
@@ -297,7 +295,7 @@ window.LIBS = [
     demo: "randomjs",
   },
   {
-    id: "chance", cat: "random", name: "chance.js", global: "Chance",
+    id: "chance", cat: "stats", name: "chance.js", global: "Chance",
     npm: "https://www.npmjs.com/package/chance", site: "https://chancejs.com",
     tagline: "随机数据生成器：不仅能抽随机数，还能按概率分布生成姓名、日期、地址等“假数据”。",
     positioning: "需要“造测试数据 / 模拟真实世界随机量”时的瑞士军刀，支持丰富的随机类型与分布。",
@@ -706,7 +704,7 @@ window.LIBS = [
 
   /* ---------- 插值 / 拟合 / 样条 ---------- */
   {
-    id: "regression", cat: "interp", name: "regression-js", global: "regression",
+    id: "regression", cat: "calculus", name: "regression-js", global: "regression",
     npm: "https://www.npmjs.com/package/regression", site: "https://github.com/Tom-Alexander/regression-js",
     tagline: "多种回归拟合库：线性、多项式、指数、对数、幂、以及多元线性回归。",
     positioning: "做“给一组数据点、拟合出一条趋势线并预测”最省事的选择，一行得到方程、R² 与预测函数。",
@@ -717,7 +715,7 @@ window.LIBS = [
     demo: "regression",
   },
   {
-    id: "d3curve", cat: "interp", name: "d3-shape 曲线插值", global: "d3",
+    id: "d3curve", cat: "calculus", name: "d3-shape 曲线插值", global: "d3",
     npm: "https://www.npmjs.com/package/d3-shape", site: "https://d3js.org/d3-shape",
     tagline: "D3 的曲线生成器：把离散点连成不同“手感”的光滑曲线（curveBasis、curveCardinal、curveCatmullRom 等）。",
     positioning: "做折线图/路径时决定“点之间怎么弯”的核心：直线、基数样条、自然样条、阶跃等一应俱全。",
@@ -728,7 +726,7 @@ window.LIBS = [
     demo: "d3curve",
   },
   {
-    id: "cubicspline", cat: "interp", name: "cubic-spline", global: "cubicSpline",
+    id: "cubicspline", cat: "calculus", name: "cubic-spline", global: "cubicSpline",
     npm: "https://www.npmjs.com/package/cubic-spline", site: "https://github.com/holomorph/cubic-spline",
     tagline: "自然三次样条插值库：给定数据点，构造处处二阶连续可导的光滑曲线。",
     positioning: "需要“穿过所有给定点且整体最平滑”的插值（如绘制平滑曲线、动画轨迹）时的标准方案。",
@@ -739,7 +737,7 @@ window.LIBS = [
     demo: "cubicspline",
   },
   {
-    id: "bezier", cat: "interp", name: "bezier-js", global: "Bezier",
+    id: "bezier", cat: "calculus", name: "bezier-js", global: "Bezier",
     npm: "https://www.npmjs.com/package/bezier-js", site: "https://github.com/Pomax/bezierjs",
     tagline: "贝塞尔曲线的“瑞士军刀”：求长度、点、切线、交点、偏移与 LUT 采样。",
     positioning: "做 2D 矢量曲线数学时免自己推导公式：Pomax 维护的贝塞尔工具集，覆盖曲线上几乎所有量。",
@@ -750,7 +748,7 @@ window.LIBS = [
     demo: "bezier",
   },
   {
-    id: "curveint", cat: "interp", name: "curve-interpolator", global: "CurveInterpolator",
+    id: "curveint", cat: "calculus", name: "curve-interpolator", global: "CurveInterpolator",
     npm: "https://www.npmjs.com/package/curve-interpolator", site: "https://github.com/tyt2/curve-interpolator",
     tagline: "通用曲线插值器：在任意点 t 上取平滑曲线上的点，支持张力与端点控制。",
     positioning: "比样条更“即取即用”的曲线插值：喂一组控制点，直接 getPoint(t) 拿平滑位置，适合动画/轨迹。",
