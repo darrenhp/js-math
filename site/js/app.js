@@ -51,10 +51,12 @@
     const inner = $("#bannerInner"); if (!inner) return;
     inner.innerHTML = "";
     CATS.forEach((cat) => {
+      const n = LIBS.filter((l) => l.cat === cat.id).length;
       const chip = document.createElement("button");
       chip.type = "button";
       chip.className = "cat-chip"; chip.dataset.cat = cat.id;
-      chip.innerHTML = `<span class="dot" style="background:${cat.color}"></span>${cat.name}`;
+      chip.style.setProperty("--chip", cat.color);
+      chip.innerHTML = `<span class="dot"></span>${cat.name}<span class="count">${n}</span>`;
       chip.onclick = () => selectCategory(cat.id);
       inner.appendChild(chip);
     });
