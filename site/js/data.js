@@ -3,32 +3,23 @@
  * ========================================================== */
 window.CATEGORIES = [
   { id: "general",  name: "通用数学计算",     color: "#7c8cff" },
-  { id: "symbolic", name: "符号计算",         color: "#b18cff" },
-  { id: "linalg",   name: "线性代数 / 矩阵",  color: "#4dd6c1" },
+  { id: "symbolic", name: "符号计算 / 逻辑代数", color: "#b18cff" },
+  { id: "linalg",   name: "线性代数 / 矩阵 / 稀疏", color: "#4dd6c1" },
   { id: "stats",    name: "统计学",           color: "#ffc234" },
   { id: "random",   name: "随机数 / 概率",    color: "#6be585" },
-  { id: "geometry", name: "几何 / 计算几何",  color: "#ff7ac6" },
+  { id: "geometry", name: "几何 / 空间计算",  color: "#ff7ac6" },
   { id: "ml",       name: "机器学习 / 张量",  color: "#ff9f6b" },
-  { id: "signal",   name: "信号处理 / 傅里叶", color: "#ff6b6b" },
-  { id: "optim",    name: "优化 / 数值求解",  color: "#f7a35c" },
+  { id: "signal",   name: "信号处理 / 时间序列", color: "#ff6b6b" },
+  { id: "calculus", name: "微积分 / 数值求解", color: "#ff6b9d" },
   { id: "graph",    name: "图论",             color: "#5ec8ff" },
   { id: "units",    name: "单位换算 / 物理",  color: "#9b8cff" },
-  { id: "numtheory",name: "数论 / 组合数学",  color: "#8cffb0" },
-  { id: "stdlib",   name: "数学生态 / 特殊函数", color: "#c0d860" },
-  { id: "genfunc",  name: "生成函数 / 多项式", color: "#7ad0ff" },
-  { id: "misc",     name: "其他 / 可视化数学", color: "#ffd166" },
-  { id: "calculus", name: "微积分 / 微分方程",  color: "#ff6b9d" },
+  { id: "numtheory",name: "数论 / 特殊数制",  color: "#8cffb0" },
+  { id: "stdlib",   name: "数学函数 / 特殊函数", color: "#c0d860" },
+  { id: "crypto",   name: "密码学数学",       color: "#ffcf5e" },
+  { id: "finance",  name: "金融数学",         color: "#5effa8" },
   { id: "interp",   name: "插值 / 拟合 / 样条", color: "#4dd0ff" },
-  { id: "geoalg",   name: "四元数 / 几何代数",  color: "#c47cff" },
-  { id: "interval", name: "区间运算 / 不确定性", color: "#7affc4" },
-  { id: "complex",  name: "复数运算",           color: "#ffb15e" },
-  { id: "fractal",  name: "分形 / 混沌",        color: "#ff5ea8" },
-  { id: "gpu",      name: "GPU 加速数学",       color: "#6b8cff" },
-  { id: "sparse",   name: "稀疏矩阵",           color: "#9ad15b" },
-  { id: "crypto",   name: "密码学数学",         color: "#ffcf5e" },
-  { id: "finance",  name: "金融数学",           color: "#5effa8" },
-  { id: "timeseries",name: "时间序列分析",      color: "#ff8f5e" },
-  { id: "bool",     name: "布尔代数 / 逻辑",    color: "#9aa7c2" },
+  { id: "misc",     name: "可视化 / 分形",    color: "#ffd166" },
+  { id: "gpu",      name: "GPU 加速数学",     color: "#6b8cff" },
 ];
 
 window.LIBS = [
@@ -468,7 +459,7 @@ window.LIBS = [
 
   /* ---------- 优化 / 数值求解 ---------- */
   {
-    id: "fmin", cat: "optim", name: "fmin", global: "fmin",
+    id: "fmin", cat: "calculus", name: "fmin", global: "fmin",
     npm: "https://www.npmjs.com/package/fmin", site: "https://github.com/freedmand/gthud-fmin",
     tagline: "无约束函数最小化库（Nelder-Mead 单纯形法等），找函数最小值。",
     positioning: "需要“给定目标函数、求使其最小化的参数”时的轻量数值优化器，常用于拟合与调参。",
@@ -479,7 +470,7 @@ window.LIBS = [
     demo: "fmin",
   },
   {
-    id: "levmar", cat: "optim", name: "ml-levenberg-marquardt", global: "MLLevenbergMarquardt",
+    id: "levmar", cat: "calculus", name: "ml-levenberg-marquardt", global: "MLLevenbergMarquardt",
     npm: "https://www.npmjs.com/package/ml-levenberg-marquardt", site: "https://github.com/mljs/levenberg-marquardt",
     tagline: "非线性最小二乘拟合库（Levenberg–Marquardt 算法），专做曲线拟合。",
     positioning: "mljs 生态的拟合利器：给定数据点与模型函数，自动求出最优参数（如指数衰减系数）。",
@@ -643,7 +634,7 @@ window.LIBS = [
 
   /* ---------- 生成函数 / 多项式（已建） ---------- */
   {
-    id: "polynomial-rw", cat: "genfunc", name: "Polynomial.js", global: "Polynomial",
+    id: "polynomial-rw", cat: "stdlib", name: "Polynomial.js", global: "Polynomial",
     npm: "https://www.npmjs.com/package/polynomial", site: "https://github.com/rawify/Polynomial.js",
     tagline: "rawify 出品的多项式运算库，把多项式乘法当作系数卷积，天然适配生成函数。",
     positioning: "生成函数系数运算的主力：多项式乘法即系数卷积，支持实数/有理数(分数)域与稀疏高次幂级数。",
@@ -654,7 +645,7 @@ window.LIBS = [
     demo: "polynomialrw",
   },
   {
-    id: "polynomium", cat: "genfunc", name: "polynomium", global: "polynomium",
+    id: "polynomium", cat: "stdlib", name: "polynomium", global: "polynomium",
     npm: "https://www.npmjs.com/package/polynomium", site: "https://github.com/lapets/polynomium",
     tagline: "支持多变量的符号多项式库，适合双变量、三维的组合计数生成函数。",
     positioning: "专注多元多项式（多变量生成函数）：用变量/常量构造、相乘展开，读取任意项系数。",
@@ -665,7 +656,7 @@ window.LIBS = [
     demo: "polynomium",
   },
   {
-    id: "jisg", cat: "genfunc", name: "jisg", global: "jisg",
+    id: "jisg", cat: "stdlib", name: "jisg", global: "jisg",
     npm: "https://www.npmjs.com/package/jisg", site: "https://github.com/acerix/jisg",
     tagline: "内置 300+ 条 OEIS 标准整数序列的生成器库，用 BigInt 精确输出。",
     positioning: "验证数列的“标准答案本”：直接生成斐波那契、卡特兰、分拆等 OEIS 序列，与多项式库结果对照。",
@@ -772,7 +763,7 @@ window.LIBS = [
 
   /* ---------- 四元数 / 几何代数 ---------- */
   {
-    id: "quaternion", cat: "geoalg", name: "quaternion.js", global: "Quaternion",
+    id: "quaternion", cat: "geometry", name: "quaternion.js", global: "Quaternion",
     npm: "https://www.npmjs.com/package/quaternion", site: "https://github.com/infusion/Quaternion.js",
     tagline: "独立的四元数运算库，专为 3D 旋转而生（比 math.js 更轻量专注）。",
     positioning: "做 3D 旋转、相机转向、轨道动画时避免万向锁的首选：四元数乘法即复合旋转，插值 slerp 平滑。",
@@ -783,7 +774,7 @@ window.LIBS = [
     demo: "quaternion",
   },
   {
-    id: "ganja", cat: "geoalg", name: "ganja.js", global: "ganja",
+    id: "ganja", cat: "geometry", name: "ganja.js", global: "ganja",
     npm: "https://www.npmjs.com/package/ganja.js", site: "https://enkimute.github.io/ganja.js",
     tagline: "几何代数 (Clifford Algebra) 库，统一描述向量、复数、四元数、旋量与更高维几何。",
     positioning: "小众但强大：用统一的代数框架处理多维几何与旋转，可生成可视化 (含 3D 投影)。",
@@ -796,7 +787,7 @@ window.LIBS = [
 
   /* ---------- 区间运算 / 不确定性 ---------- */
   {
-    id: "interval", cat: "interval", name: "interval-arithmetic", global: "Interval",
+    id: "interval", cat: "numtheory", name: "interval-arithmetic", global: "Interval",
     npm: "https://www.npmjs.com/package/interval-arithmetic", site: "https://github.com/inexorabletash/interval-arithmetic",
     tagline: "区间数学库：用 [a,b] 区间表示不确定量，自动传播误差范围。",
     positioning: "当输入有测量误差或需保证数值边界时，用区间运算替代单点近似，得到“结果一定落在其中”的范围。",
@@ -809,7 +800,7 @@ window.LIBS = [
 
   /* ---------- 复数 ---------- */
   {
-    id: "complex", cat: "complex", name: "complex.js", global: "Complex",
+    id: "complex", cat: "numtheory", name: "complex.js", global: "Complex",
     npm: "https://www.npmjs.com/package/complex.js", site: "https://complex-js.github.io/complex.js",
     tagline: "独立的复数运算库，比 math.js 的复数更轻量、专注于复数域。",
     positioning: "需要大量复数运算（如电气/信号/分形）而又不想引入整个数学引擎时的精简选择。",
@@ -822,7 +813,7 @@ window.LIBS = [
 
   /* ---------- 分形 / 混沌 ---------- */
   {
-    id: "mandelbrot", cat: "fractal", name: "Mandelbrot / Julia 分形", global: "Complex",
+    id: "mandelbrot", cat: "misc", name: "Mandelbrot / Julia 分形", global: "Complex",
     npm: "https://www.npmjs.com/package/complex.js", site: "https://complex-js.github.io/complex.js",
     tagline: "用复数迭代 z → z² + c 在浏览器里实时绘制 Mandelbrot 与 Julia 集（基于 complex.js）。",
     positioning: "“没有独立库”的分形领域，用现成的复数库 + Canvas 即可实现经典的逃逸时间分形渲染。",
@@ -848,7 +839,7 @@ window.LIBS = [
 
   /* ---------- 稀疏矩阵 ---------- */
   {
-    id: "mlsparse", cat: "sparse", name: "ml-sparse-matrix", global: "SparseMatrix",
+    id: "mlsparse", cat: "linalg", name: "ml-sparse-matrix", global: "SparseMatrix",
     npm: "https://www.npmjs.com/package/ml-sparse-matrix", site: "https://github.com/mljs/sparse-matrix",
     tagline: "mljs 生态的稀疏矩阵库，面向机器学习（如 TF-IDF、推荐系统的特征矩阵）。",
     positioning: "做 ML 特征矩阵（极稀疏的高维 one-hot/TF-IDF）时的轻量稀疏结构，支持常见线性代数与分解。",
@@ -920,7 +911,7 @@ window.LIBS = [
 
   /* ---------- 时间序列分析 ---------- */
   {
-    id: "timeseries", cat: "timeseries", name: "timeseries-analysis", global: "TimeSeriesAnalysis",
+    id: "timeseries", cat: "signal", name: "timeseries-analysis", global: "TimeSeriesAnalysis",
     npm: "https://www.npmjs.com/package/timeseries-analysis", site: "https://github.com/Felswrath/timeseries-analysis",
     tagline: "时间序列分析库：移动平均、加权移动平均、自相关、简单预测等。",
     positioning: "做股价/传感器/指标的时序预处理与基础预测时的轻量工具，无需引入庞大数据科学栈。",
@@ -933,7 +924,7 @@ window.LIBS = [
 
   /* ---------- 布尔代数 / 逻辑 ---------- */
   {
-    id: "booleanjs", cat: "bool", name: "boolean.js", global: "booleanjs",
+    id: "booleanjs", cat: "symbolic", name: "boolean.js", global: "booleanjs",
     npm: "https://www.npmjs.com/package/boolean", site: "https://github.com/jifalops/boolean",
     tagline: "布尔表达式解析与化简库：把 'A and (B or not C)' 解析、求值与化简。",
     positioning: "需要处理“逻辑表达式字符串”（解析、代入变量、化简、求值）时的小众但实用工具。",
